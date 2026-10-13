@@ -6409,9 +6409,12 @@ onOn=function(api) api.dot=api.fr(api.gui,10,60,12,12,Color3.new(1,0,0),0,6) api
 onOff=function(api) if api.dot then api.dot:Destroy() api.dot=nil end end,
 onTick=function(api,dt) if api.dot then api.dot.Position=UDim2.fromOffset(10+math.abs(math.sin(os.clock()))*300,60) end end}]]) end
 
--- ===== .TENDIES WALLPAPERS (CAML engine) =====
+-- ===== .TENDIES WALLPAPERS (CAML engine v2) =====
 -- Drop the .tendies file straight into workspace/IOS18/wallpapers/ . The script unzips it by itself
--- (into workspace/IOS18/tendies_cache/) and finds the *.ca layer folders. Already-extracted folders also work.
+-- (into workspace/IOS18/tendies_cache/) and finds every *.ca layer folder (any depth). Already-extracted folders also work.
+-- v2: CoreAnimation-accurate layer tree (y axis / geometryFlipped, anchor points, composed transforms), LKState machine with
+-- state transitions (basic / spring / bezier), keyframe animations (linear, cubic, paced), emitters, text, gradients, clipping.
+local TE={packs={},UNK={},IGN={},warned={}}
 local FP={cnt=0,dir=""}
 FP.nid=function() FP.cnt=FP.cnt+1 return "_L"..FP.cnt end
 FP.urld=function(s2) return (tostring(s2):gsub("%%(%x%x)",function(h) return string.char(tonumber(h,16)) end)) end
@@ -6549,13 +6552,326 @@ FP.unzip=(function()
      cb(name,data) end end
   end end
 end)()
-local packs={}
+-- ---------- small utilities ----------
+local D2R=math.pi/180
+TE.num=function(v,d)
+ if v==nil then return d end
+ local l=tostring(v):lower()
+ if l:find("inf",1,true) then return (l:sub(1,1)=="-") and -math.huge or math.huge end
+ return tonumber(l) or tonumber(l:match("^[%-%d%.eE%+]+")) or d end
+-- safer number scanner: handles 1e-100, -5.3e4, .5, 3
+TE.nums=function(s)
+ local t={} s=tostring(s or "")
+ local i,n=1,#s
+ while i<=n do
+  local a,b=s:find("^[%-%+]?%d*%.?%d+",i)
+  if not a then a,b=s:find("^[%-%+]?%d+%.?",i) end
+  if a then
+   local e1,e2=s:find("^[eE][%-%+]?%d+",b+1)
+   if e1 then b=e2 end
+   local v=tonumber(s:sub(a,b)) if v then t[#t+1]=v end
+   i=b+1
+  else i=i+1 end
+ end
+ return t end
+TE.col=function(s,op)
+ local n=TE.nums(s) if #n<3 then return nil end
+ return {n[1],n[2],n[3],TE.num(op,n[4] or 1)} end
+local function xmlDecode(s)
+ if not s:find("&",1,true) then return s end
+ s=s:gsub("&#[xX](%x+);",function(h) local ok,c=pcall(utf8.char,tonumber(h,16)) return ok and c or "" end)
+ s=s:gsub("&#(%d+);",function(d) local ok,c=pcall(utf8.char,tonumber(d)) return ok and c or "" end)
+ return (s:gsub("&lt;","<"):gsub("&gt;",">"):gsub("&quot;",'"'):gsub("&apos;","'"):gsub("&amp;","&")) end
+-- robust XML reader: comments, CDATA, PI, quoted attributes containing '>' , entities
+TE.xml=function(s)
+ local root={tag="#root",a={},kids={}}
+ local stack={root}
+ local pos,len=1,#s
+ while true do
+  local lt=s:find("<",pos,true)
+  if not lt then break end
+  local c2=s:sub(lt+1,lt+1)
+  if s:sub(lt,lt+3)=="<!--" then
+   local e=s:find("-->",lt+4,true) pos=(e or len)+3
+  elseif s:sub(lt,lt+8)=="<![CDATA[" then
+   local e=s:find("]]>",lt+9,true) pos=(e or len)+3
+  elseif c2=="?" or c2=="!" then
+   local e=s:find(">",lt+1,true) pos=(e or len)+1
+  elseif c2=="/" then
+   local e=s:find(">",lt+1,true) if #stack>1 then stack[#stack]=nil end pos=(e or len)+1
+  else
+   local i=lt+1
+   while true do
+    local j=s:find("[\">']",i)
+    if not j then i=len+1 break end
+    local ch=s:sub(j,j)
+    if ch==">" then i=j break end
+    local e=s:find(ch,j+1,true)
+    if not e then i=len+1 break end
+    i=e+1
+   end
+   local body=s:sub(lt+1,i-1)
+   local selfc=body:sub(-1)=="/"
+   if selfc then body=body:sub(1,-2) end
+   local name=body:match("^([%w_:%.%-]+)")
+   if name then
+    local a={}
+    for k,_,v in body:sub(#name+1):gmatch("([%w_:%.%-]+)%s*=%s*([\"'])(.-)%2") do a[k]=xmlDecode(v) end
+    local node={tag=name,a=a,kids={}}
+    local par=stack[#stack] par.kids[#par.kids+1]=node
+    if not selfc then stack[#stack+1]=node end
+   end
+   pos=i+1
+  end
+ end
+ return root end
+TE.kid=function(n,tag) for _,k in ipairs(n.kids) do if k.tag==tag then return k end end end
+TE.deep=function(n,tag) for _,k in ipairs(n.kids) do if k.tag==tag then return k end local r=TE.deep(k,tag) if r then return r end end end
+local nums,num,kid=TE.nums,TE.num,TE.kid
+
+-- ---------- transform strings ----------
+-- composes rotate()/scale()/translate()/matrix() in order (CSS-like, first = outermost); rotations around the X / Y axes
+-- (card flips) become cos() scale factors. Result is decomposed into rot (deg, CA sense), rx, ry, sx, sy, tx, ty.
+TE.parseTf=function(t)
+ local a,b,c,d,e,f=1,0,0,1,0,0
+ local function mul(a2,b2,c2,d2,e2,f2)
+  a,b,c,d,e,f=a*a2+c*b2,b*a2+d*b2,a*c2+c*d2,b*c2+d*d2,a*e2+c*f2+e,b*e2+d*f2+f end
+ for nm,args in tostring(t or ""):gmatch("([%a%d]+)%(([^)]*)%)") do
+  local v=nums(args)
+  if nm=="rotate" or nm=="rotateZ" then
+   local ang=(v[1] or 0)*D2R
+   local ax,ay,az=v[2],v[3],v[4]
+   if ax and (math.abs(az or 0)<.5) then
+    if math.abs(ax)>=math.abs(ay or 0) and math.abs(ax)>.5 then mul(1,0,0,math.cos(ang),0,0)
+    elseif math.abs(ay or 0)>.5 then mul(math.cos(ang),0,0,1,0,0) end
+   else mul(math.cos(ang),math.sin(ang),-math.sin(ang),math.cos(ang),0,0) end
+  elseif nm=="rotateX" then mul(1,0,0,math.cos((v[1] or 0)*D2R),0,0)
+  elseif nm=="rotateY" then mul(math.cos((v[1] or 0)*D2R),0,0,1,0,0)
+  elseif nm=="scale" then local sx=v[1] or 1 mul(sx,0,0,v[2] or sx,0,0)
+  elseif nm=="scaleX" then mul(v[1] or 1,0,0,1,0,0)
+  elseif nm=="scaleY" then mul(1,0,0,v[1] or 1,0,0)
+  elseif nm=="translate" then mul(1,0,0,1,v[1] or 0,v[2] or 0)
+  elseif nm=="translateX" then mul(1,0,0,1,v[1] or 0,0)
+  elseif nm=="translateY" then mul(1,0,0,1,0,v[1] or 0)
+  elseif nm=="matrix" and #v>=6 then mul(v[1],v[2],v[3],v[4],v[5],v[6])
+  elseif nm=="matrix3d" and #v>=16 then mul(v[1],v[2],v[5],v[6],v[13],v[14]) end
+ end
+ local sx=math.sqrt(a*a+b*b)
+ local rot=(sx>1e-9) and math.deg(math.atan2(b,a)) or 0
+ local sy=(sx>1e-9) and (a*d-b*c)/sx or math.sqrt(c*c+d*d)
+ return rot,sx,sy,e,f end
+
+-- ---------- timing ----------
+local bezCache={}
+TE.bez=function(x1,y1,x2,y2)
+ local key=x1..","..y1..","..x2..","..y2
+ if bezCache[key] then return bezCache[key] end
+ local cx=3*x1 local bx=3*(x2-x1)-cx local ax=1-cx-bx
+ local cy=3*y1 local by=3*(y2-y1)-cy local ay=1-cy-by
+ local fn=function(x)
+  if x<=0 then return 0 elseif x>=1 then return 1 end
+  local t=x
+  for _=1,8 do
+   local err=((ax*t+bx)*t+cx)*t-x
+   if math.abs(err)<1e-6 then break end
+   local d=(3*ax*t+2*bx)*t+cx
+   if math.abs(d)<1e-6 then break end
+   t=t-err/d end
+  if t<0 or t>1 then
+   local lo,hi=0,1 t=x
+   for _=1,24 do local v=((ax*t+bx)*t+cx)*t if v<x then lo=t else hi=t end t=(lo+hi)/2 end end
+  return ((ay*t+by)*t+cy)*t end
+ bezCache[key]=fn return fn end
+TE.LIN=function(x) return x end
+TE.NAMED={linear=TE.LIN,easeIn=TE.bez(.42,0,1,1),easeOut=TE.bez(0,0,.58,1),easeInEaseOut=TE.bez(.42,0,.58,1),default=TE.bez(.25,.1,.25,1)}
+TE.tfn=function(s)
+ if not s or s=="" then return nil end
+ if TE.NAMED[s] then return TE.NAMED[s] end
+ local n=nums(s) if #n>=4 then return TE.bez(n[1],n[2],n[3],n[4]) end
+ return nil end
+-- damped spring, progress 0 -> 1 (may overshoot). v0 = initial velocity in progress units / s
+TE.spring=function(m,k,c,v0)
+ m=(m and m>0) and m or 1 k=k or 100 c=c or 10 v0=v0 or 0
+ local w0=math.sqrt(k/m) local z=c/(2*math.sqrt(k*m))
+ local settle=math.min(4,math.max(.2,6.9/math.max(z*w0,.01)))
+ local fn
+ if z<.9999 then
+  local wd=w0*math.sqrt(1-z*z) local B=(v0-z*w0)/wd
+  fn=function(t) return 1-math.exp(-z*w0*t)*(math.cos(wd*t)-B*math.sin(wd*t)) end
+ elseif z<=1.0001 then
+  fn=function(t) return 1-(1-(v0-w0)*t)*math.exp(-w0*t) end
+ else
+  local s=math.sqrt(z*z-1) local r1,r2=-w0*(z-s),-w0*(z+s)
+  local C2=(v0-r1*(-1))/(r2-r1) local C1=-1-C2
+  fn=function(t) return 1+C1*math.exp(r1*t)+C2*math.exp(r2*t) end
+ end
+ return fn,settle end
+
+-- ---------- keyPath table ----------
+local function cm20() local t={} for i=1,20 do t[i]="m"..i end return t end
+TE.KP={["position.x"]={k={"x"}},["position.y"]={k={"y"}},position={k={"x","y"}},
+ ["bounds.size.width"]={k={"w"}},["bounds.size.height"]={k={"h"}},["bounds.size"]={k={"w","h"}},bounds={k={"ox","oy","w","h"}},
+ ["bounds.origin.x"]={k={"ox"}},["bounds.origin.y"]={k={"oy"}},
+ opacity={k={"op"}},hidden={k={"hid"},disc=true},
+ ["transform.rotation.z"]={k={"rot"},mul=57.29578},["transform.rotation"]={k={"rot"},mul=57.29578},
+ ["transform.rotation.x"]={k={"rx"},mul=57.29578},["transform.rotation.y"]={k={"ry"},mul=57.29578},
+ ["transform.scale.xy"]={k={"sx","sy"}},["transform.scale"]={k={"sx","sy"}},["transform.scale.x"]={k={"sx"}},["transform.scale.y"]={k={"sy"}},
+ ["transform.translation.x"]={k={"tx"}},["transform.translation.y"]={k={"ty"}},["transform.translation"]={k={"tx","ty"}},
+ anchorPoint={k={"ax","ay"}},["anchorPoint.x"]={k={"ax"}},["anchorPoint.y"]={k={"ay"}},
+ cornerRadius={k={"cr"}},borderWidth={k={"bw"}},speed={k={"spd"}},
+ backgroundColor={k={"bgR","bgG","bgB","bgA"},col=true},borderColor={k={"bcR","bcG","bcB","bcA"},col=true},
+ contentsMultiplyColor={k={"tnR","tnG","tnB","tnA"},col=true},
+ ["filters.colorMatrix.inputColorMatrix"]={k=cm20(),vec=true}}
+for _,n in ipairs({"shadowOpacity","shadowRadius","shadowOffset","shadowColor","locked","masksToBounds","continuousCorners","compositingFilter",
+ "zPosition","autoreverses","timeOffset","beginTime","contentsRect","sublayers","contents","transform","emitterSize","emitterPosition"}) do TE.IGN[n]=true end
+TE.warnOnce=function(k,msg) if not TE.warned[k] then TE.warned[k]=true warn("[iOS18] "..msg) end end
+
+-- one value element -> component array
+TE.pval=function(m,x)
+ if not x then return nil end
+ local v
+ if m.col then
+  local raw=x.a.value or ""
+  local c=TE.col(raw,x.a.opacity) if not c then return nil end
+  return c
+ elseif m.vec then v=nums(x.a.value) if #v<#m.k then return nil end return v
+ else
+  v=nums(x.a.value)
+  if #v==0 then return nil end
+  local out={}
+  for i=1,#m.k do out[i]=(v[i] or v[1])*(m.mul or 1) end
+  return out end end
+
+-- ---------- timing description shared by animations and transitions ----------
+local function timing(an)
+ local a=an.a
+ local dur=math.max(num(a.duration,1),.001) if dur==math.huge then dur=1e9 end
+ local rep=1
+ if a.repeatCount then rep=num(a.repeatCount,1) if rep<=0 then rep=1 elseif rep>=1e5 then rep=math.huge end end
+ if a.repeatDuration then local rd=num(a.repeatDuration,0) if rd==math.huge or rd>=1e5 then rep=math.huge elseif rd>0 then rep=rd/dur end end
+ local bt=num(a.beginTime,0) if bt>1e5 or bt<-1e5 then bt=0 end
+ local fill=tostring(a.fillMode or "removed"):lower()
+ local rem=tostring(a.removedOnCompletion or "1"):lower()
+ local ar=(a.autoreverses=="1") or (tostring(a.autoreverses):lower()=="true")
+ return {dur=dur,rep=rep,ar=ar,tot=rep*(ar and 2 or 1),spd=num(a.speed,1),begin=bt,toff=num(a.timeOffset,0),
+  hold=(fill=="forwards" or fill=="both" or rem=="0" or rem=="false" or rem=="no"),back=(fill=="backwards" or fill=="both"),
+  tf=TE.tfn(a.timingFunction)} end
+
+-- transition element -> spec { dur, begin, tf, spring }
+TE.trSpec=function(an,el)
+ if not an then return nil end
+ local T=timing(an)
+ local s={dur=T.dur,begin=T.begin,spd=(T.spd~=0) and T.spd or 1,tf=T.tf or TE.LIN,off=false}
+ if an.a.type=="CASpringAnimation" then
+  local fn,settle=TE.spring(num(an.a.mass,1),num(an.a.stiffness,100),num(an.a.damping,10),num(an.a.velocity,0))
+  s.spring=fn
+  if not an.a.duration then s.dur=settle end
+ end
+ if el and (el.a.enabled=="false" or el.a.enabled=="0") then s.off=true end
+ return s end
+
+-- ---------- animations ----------
+TE.parseAnim=function(an,tid)
+ local a=an.a local at=a.type or "" local kp=a.keyPath or ""
+ if at=="CATransition" then return nil end
+ local m=TE.KP[kp]
+ if not m then
+  if kp~="" and not TE.IGN[kp] and not kp:find("^emitterCells") then TE.UNK[kp.." ("..at..")"]=true end
+  return nil end
+ if at~="CAKeyframeAnimation" and at~="CABasicAnimation" and at~="CASpringAnimation" then return nil end
+ local vals,kt={},{}
+ local function add(x) local v=TE.pval(m,x) if v then vals[#vals+1]=v end return v end
+ local isKF=(at=="CAKeyframeAnimation")
+ local fromBase=false
+ if isKF then
+  local vn=kid(an,"values") if vn then for _,x in ipairs(vn.kids) do add(x) end end
+  local kn=kid(an,"keyTimes") if kn then for _,x in ipairs(kn.kids) do local n=tonumber(x.a.value) if n then kt[#kt+1]=n end end end
+ else
+  local function bv(name)
+   local e=kid(an,name)
+   if e then local c=e.kids[1] if c then return add(c) end if e.a.value then return add(e) end end
+   if a[name] then return add({a={value=a[name]}}) end end
+  local f=bv("fromValue") local t2=bv("toValue")
+  if f and not t2 then fromBase=false end
+  if not f and t2 then table.insert(vals,1,false) fromBase=true end
+ end
+ local n=#vals
+ if n<2 and not (isKF and n==1) then return nil end
+ local calc=a.calculationMode or "linear"
+ local disc=(calc=="discrete")
+ if n>1 and (#kt<n or #kt>n+1 or (#kt==n+1 and not disc)) then
+  kt={} for i=1,n do kt[i]=disc and (i-1)/n or (i-1)/(n-1) end end
+ local T=timing(an)
+ local A={id=tid,keys=m.k,vals=vals,kt=kt,calc=calc,disc=disc,fromBase=fromBase,add=(a.additive=="1"),
+  dur=T.dur,rep=T.rep,ar=T.ar,tot=T.tot,spd=T.spd,begin=T.begin,toff=T.toff,hold=T.hold,back=T.back,tf=T.tf,kf=isKF,disc1=m.disc}
+ if at=="CASpringAnimation" then A.spring=TE.spring(num(a.mass,1),num(a.stiffness,100),num(a.damping,10),num(a.velocity,0)) end
+ return A end
+
+local function lerpv(a,b,f)
+ local o={} for i=1,#a do o[i]=a[i]+((b[i] or a[i])-a[i])*f end return o end
+local function catmull(p0,p1,p2,p3,f)
+ local o={}
+ local f2,f3=f*f,f*f*f
+ for i=1,#p1 do
+  local a0,a1,a2,a3=p0[i] or p1[i],p1[i],p2[i] or p1[i],p3[i] or p2[i] or p1[i]
+  o[i]=.5*((2*a1)+(-a0+a2)*f+(2*a0-5*a1+4*a2-a3)*f2+(-a0+3*a1-3*a2+a3)*f3) end
+ return o end
+local function dist(a,b) local s=0 for i=1,#a do local d=(b[i] or a[i])-a[i] s=s+d*d end return math.sqrt(s) end
+
+-- returns component array (or nil when the animation is not in effect). cur = value without animation (for from-less / additive)
+TE.animEval=function(A,t,cur)
+ local lt=(t-A.begin)*A.spd+A.toff
+ if lt<0 then if A.back then lt=0 else return nil end end
+ local cyc=lt/A.dur
+ if cyc>=A.tot then if not A.hold then return nil end cyc=A.tot end
+ local ph
+ if A.ar then local m=cyc%2 ph=(m<=1) and m or (2-m)
+ else ph=cyc%1 if cyc>0 and ph==0 and cyc>=A.tot then ph=1 end end
+ local vals=A.vals local n=#vals
+ local out
+ if A.spring and not A.kf then
+  local p=A.spring(ph*A.dur) local v1=vals[1] or cur local v2=vals[2]
+  out=lerpv(v1,v2,p)
+ else
+  if A.tf then ph=A.tf(ph) end
+  local kt=A.kt
+  if A.disc then
+   local k=1 for i=1,n do if ph>=kt[i] then k=i end end out=vals[k]
+  elseif n==1 then out=vals[1]
+  else
+   local calc=A.calc
+   local times=kt
+   if calc=="paced" or calc=="cubicPaced" then
+    if not A.paced then
+     local cum,tot={0},0
+     for i=2,n do tot=tot+dist(vals[i-1],vals[i]) cum[i]=tot end
+     local ts={} for i=1,n do ts[i]=(tot>0) and cum[i]/tot or (i-1)/(n-1) end
+     A.paced=ts end
+    times=A.paced end
+   local k=n-1
+   for i=1,n-1 do if ph<=times[i+1] then k=i break end end
+   if ph<=times[1] then out=vals[1]
+   else
+    local f=(ph-times[k])/math.max(times[k+1]-times[k],1e-9)
+    if f>1 then f=1 end
+    if calc=="cubic" or calc=="cubicPaced" then out=catmull(vals[k-1] or vals[k],vals[k],vals[k+1],vals[k+2] or vals[k+1],f)
+    else out=lerpv(vals[k],vals[k+1],f) end
+   end
+  end
+ end
+ if A.add and cur then local o={} for i=1,#out do o[i]=out[i]+(cur[i] or 0) end out=o end
+ return out end
+-- ---------- assets ----------
 local assetCache,sizeCache={},{}
-local function asset(path)
+local OKEXT={png=1,jpg=1,jpeg=1,tga=1,bmp=1}
+TE.asset=function(path)
+ if not path then return nil end
  if assetCache[path]==nil then
-  local ok,r=pcall(GA,path) assetCache[path]=(ok and r) or false end
+  local ext=tostring(path):match("%.(%w+)$") ext=ext and ext:lower()
+  if ext and not OKEXT[ext] then TE.warnOnce("ext"..path,"Roblox cannot display '"..path:match("[^/]*$").."' ("..ext..") - layer drawn without image") assetCache[path]=false
+  else local ok,r=pcall(GA,path) assetCache[path]=(ok and r) or false end end
  return assetCache[path] end
-local function imgSize(path)
+TE.imgSize=function(path)
  local c=sizeCache[path] if c then return c[1],c[2] end
  local w,h=100,100
  local ok,d=pcall(readfile,path)
@@ -6578,177 +6894,178 @@ local function imgSize(path)
  if w<1 then w=100 end if h<1 then h=100 end
  sizeCache[path]={w,h} return w,h end
 
-local function xml(s)
- local root={tag="#root",a={},kids={}}
- local stack={root}
- for c in s:gmatch("<([^>]+)>") do
-  local f=c:sub(1,1)
-  if f=="/" then if #stack>1 then stack[#stack]=nil end
-  elseif f~="?" and f~="!" then
-   local name=c:match("^([%w_:%.%-]+)")
-   if name then
-    local a={}
-    for k,v in c:gmatch('([%w_:%.%-]+)="([^"]*)"') do a[k]=v end
-    local node={tag=name,a=a,kids={}}
-    local par=stack[#stack] par.kids[#par.kids+1]=node
-    if c:sub(-1)~="/" then stack[#stack+1]=node end
-   end end end
- return root end
-local function kid(n,tag) for _,k in ipairs(n.kids) do if k.tag==tag then return k end end end
-local function deep(n,tag) for _,k in ipairs(n.kids) do if k.tag==tag then return k end local r=deep(k,tag) if r then return r end end end
-local function nums(s) local t={} for tok in (s or ""):gmatch("[%-%d%.eE%+]+") do local n=tonumber(tok) if n then t[#t+1]=n end end return t end
-local function parseTf(t) local rot,sx,sy,tx,ty=0,1,1,0,0
- for nm,args in (t or ""):gmatch("([%a%d]+)%(([^)]*)%)") do local v=nums(args)
-  if nm=="rotate" then rot=v[1] or 0
-  elseif nm=="scale" then sx=v[1] or 1 sy=v[2] or sx
-  elseif nm=="translate" then tx=v[1] or 0 ty=v[2] or 0
-  elseif nm=="matrix" and #v>=6 then rot=math.deg(math.atan2(v[2],v[1])) sx=math.sqrt(v[1]^2+v[2]^2) sy=math.sqrt(v[3]^2+v[4]^2) tx=v[5] ty=v[6]
-  elseif nm=="matrix3d" and #v>=16 then rot=math.deg(math.atan2(v[2],v[1])) sx=math.sqrt(v[1]^2+v[2]^2) sy=math.sqrt(v[5]^2+v[6]^2) tx=v[13] ty=v[14] end end
- return rot,sx,sy,tx,ty end
-
-local KP={["position.x"]={k={"x"}},["position.y"]={k={"y"}},["bounds.size.width"]={k={"w"}},["bounds.size.height"]={k={"h"}},
- opacity={k={"op"}},hidden={k={"hid"}},["transform.rotation.z"]={k={"rot"},mul=57.29578},["transform.rotation"]={k={"rot"},mul=57.29578},
- ["transform.scale.xy"]={k={"sx","sy"}},["transform.scale"]={k={"sx","sy"}},["transform.scale.x"]={k={"sx"}},["transform.scale.y"]={k={"sy"}},
- ["transform.translation.x"]={k={"tx"}},["transform.translation.y"]={k={"ty"}},position={k={"x","y"},pair=true},contents={k={},seq=true}}
-local UNK={}
--- parses one CAKeyframeAnimation / CABasicAnimation into a table the renderer can evaluate
-local function parseAnim(an,tid)
- local at=an.a.type or "" local kp=an.a.keyPath or ""
- local m=KP[kp]
- if not m or (at~="CAKeyframeAnimation" and at~="CABasicAnimation") then
-  if kp~="" or at~="" then UNK[kp.." ("..at..")"]=true end return nil end
- local vals,imgs,kt={},{},{}
- local function pv(x)
-  if x.a.src then imgs[#imgs+1]=FP.rel(x.a.src) return end
-  local val=x.a.value
-  if m.pair then local n=nums(val) if #n>=2 then vals[#vals+1]={n[1],n[2]} end
-  else local n=tonumber(val) if n then vals[#vals+1]=n end end end
- if at=="CAKeyframeAnimation" then
-  local vn=kid(an,"values") if vn then for _,x in ipairs(vn.kids) do pv(x) end end
-  local kn=kid(an,"keyTimes") if kn then for _,x in ipairs(kn.kids) do local n=tonumber(x.a.value) if n then kt[#kt+1]=n end end end
- else
-  local function bv(name)
-   local e=kid(an,name)
-   if e then local c=e.kids[1] if c then pv(c) return end if e.a.value or e.a.src then pv(e) return end end
-   if an.a[name] then pv({a={value=an.a[name]}}) end end
-  bv("fromValue") bv("toValue") end
- local n=m.seq and #imgs or #vals
- if n<2 then return nil end
- local disc=(an.a.calculationMode=="discrete") or m.seq and true or false
- if #kt<n or #kt>n+1 or (#kt==n+1 and not disc) then
-  kt={} for i=1,n do kt[i]=disc and (i-1)/n or (i-1)/(n-1) end end
- local dur=math.max(tonumber(an.a.duration) or 1,.01)
- local rep=1
- local rc=an.a.repeatCount
- if rc then local l=tostring(rc):lower()
-  if l:find("inf") then rep=math.huge else rep=tonumber(l) or 1 if rep>=1e5 then rep=math.huge elseif rep<=0 then rep=1 end end end
- local rd=an.a.repeatDuration
- if rd then local l=tostring(rd):lower()
-  if l:find("inf") then rep=math.huge else local nn=tonumber(l) if nn and nn>0 then rep=(nn>=1e5) and math.huge or nn/dur end end end
- local bt=tonumber(an.a.beginTime) or 0 if bt>1e5 or bt<-1e5 then bt=0 end
- local fill=tostring(an.a.fillMode or "removed"):lower()
- local rem=tostring(an.a.removedOnCompletion or "1"):lower()
- local ar=(an.a.autoreverses=="1") or (tostring(an.a.autoreverses):lower()=="true")
- local A={id=tid,keys=m.k,mul=m.mul or 1,vals=vals,imgs=(m.seq and imgs) or nil,kt=kt,dur=dur,rep=rep,ar=ar,
-  tot=rep*(ar and 2 or 1),spd=tonumber(an.a.speed) or 1,begin=bt,toff=tonumber(an.a.timeOffset) or 0,disc=disc,
-  hold=(fill=="forwards" or fill=="both" or rem=="0" or rem=="false" or rem=="no"),back=(fill=="backwards" or fill=="both")}
- return A end
-
-local function mkLayer(el,dir,reg)
+-- ---------- layer model ----------
+local EMK={birthRate=1,lifetime=1,velocity=1,scale=1,spin=1,speed=1}
+TE.imgSrc=function(el)
+ if not el then return nil end
+ if el.a.src then return el.a.src end
+ local g=kid(el,"CGImage") return g and g.a.src or nil end
+local LAYER={CALayer=1,CAEmitterLayer=1,CAGradientLayer=1,CAShapeLayer=1,CATextLayer=1,CATransformLayer=1,CAReplicatorLayer=1,CATiledLayer=1,CAScrollLayer=1}
+TE.mkLayer=function(el,dir,reg,parent)
  local a=el.a
  local b,p,an=nums(a.bounds),nums(a.position),nums(a.anchorPoint)
- local rot,sx,sy,tx,ty=parseTf(a.transform)
- local L={tag=el.tag,id=a.id or FP.nid(),name=a.name or "",ox=b[1] or 0,oy=b[2] or 0,kids={},flip=(a.geometryFlipped=="1"),
-  base={w=b[3] or 0,h=b[4] or 0,x=p[1] or 0,y=p[2] or 0,ax=an[1] or .5,ay=an[2] or .5,op=tonumber(a.opacity) or 1,
-  hid=(a.hidden=="1") and 1 or 0,rot=rot,sx=sx,sy=sy,tx=tx,ty=ty}}
- if a.backgroundColor then local c=nums(a.backgroundColor) L.bg=Color3.new(c[1] or 0,c[2] or 0,c[3] or 0) L.bgA=c[4] or 1
-  if L.bgA<=.003 then L.bg=nil end end
- local ct=kid(el,"contents") if ct and ct.a.src then L.img=dir.."/"..FP.rel(ct.a.src) end
- L.grav=a.contentsGravity L.zp=tonumber(a.zPosition) or 0
+ local rot,sx,sy,tx,ty
+ if a.transform and a.transform~="" then rot,sx,sy,tx,ty=TE.parseTf(a.transform)
+ else rot,sx,sy,tx,ty=(tonumber(a["transform.rotation.z"]) or 0)*57.29578,1,1,0,0 end
+ local rx,ry=0,0
+ if not (a.transform and a.transform:find("rotate")) then rx=(tonumber(a["transform.rotation.x"]) or 0)*57.29578 ry=(tonumber(a["transform.rotation.y"]) or 0)*57.29578 end
+ local L={tag=el.tag,id=a.id or FP.nid(),name=a.name or "",kids={},flip=(a.geometryFlipped=="1"),parent=parent,dir=dir,
+  base={ox=b[1] or 0,oy=b[2] or 0,w=b[3] or 0,h=b[4] or 0,x=p[1] or 0,y=p[2] or 0,ax=an[1] or .5,ay=an[2] or .5,
+  op=num(a.opacity,1),hid=(a.hidden=="1") and 1 or 0,rot=rot,rx=rx,ry=ry,sx=sx,sy=sy,tx=tx,ty=ty,cr=num(a.cornerRadius,0),bw=num(a.borderWidth,0),
+  spd=num(a.speed,1),bgR=0,bgG=0,bgB=0,bgA=0,bcR=0,bcG=0,bcB=0,bcA=1,tnR=1,tnG=1,tnB=1,tnA=1}}
+ local B=L.base
+ local bc=a.backgroundColor and TE.col(a.backgroundColor)
+ local bk=kid(el,"backgroundColor") if bk then bc=TE.col(bk.a.value,bk.a.opacity) or bc end
+ if bc then B.bgR,B.bgG,B.bgB,B.bgA=bc[1],bc[2],bc[3],bc[4] end
+ local bo=a.borderColor and TE.col(a.borderColor) if bo then B.bcR,B.bcG,B.bcB,B.bcA=bo[1],bo[2],bo[3],bo[4] end
+ local tk=kid(el,"contentsMultiplyColor") if tk then local c=TE.col(tk.a.value,tk.a.opacity) if c then B.tnR,B.tnG,B.tnB,B.tnA=c[1],c[2],c[3],c[4] end end
+ L.mask=(a.masksToBounds=="1")
+ L.bt=num(a.beginTime,0) if math.abs(L.bt)>1e5 then L.bt=0 end L.to=num(a.timeOffset,0)
+ local ct=kid(el,"contents")
+ local src=TE.imgSrc(ct)
+ if src then L.img=dir.."/"..FP.rel(src) end
+ L.grav=a.contentsGravity or "resize" L.cs=num(a.contentsScale,1) if L.cs<=0 then L.cs=1 end
+ local cr=nums(a.contentsRect) if #cr>=4 and not (cr[1]==0 and cr[2]==0 and cr[3]==1 and cr[4]==1) then L.crect=cr end
+ L.zp=num(a.zPosition,0)
+ if a.compositingFilter or kid(el,"compositingFilter") then L.blend=true end
+ if el.tag=="CATextLayer" then
+  local s=kid(el,"string") local f=kid(el,"font")
+  L.text={s=s and s.a.value or (a.string or ""),size=num(a.fontSize,36),font=f and f.a.value,al=a.alignmentMode or "natural",wrap=(a.wrapped=="1"),
+   col=TE.col(a.foregroundColor) or {1,1,1,1}}
+ elseif el.tag=="CAGradientLayer" then
+  local cs,ls={},{}
+  local ck=kid(el,"colors") if ck then for _,x in ipairs(ck.kids) do local c=TE.col(x.a.value,x.a.opacity) if c then cs[#cs+1]=c end end end
+  local lk=kid(el,"locations") if lk then for _,x in ipairs(lk.kids) do ls[#ls+1]=tonumber(x.a.value) or 0 end end
+  if #cs>=2 then L.grad={cols=cs,locs=ls,sp=nums(a.startPoint),ep=nums(a.endPoint)} end
+ elseif el.tag=="CAShapeLayer" then
+  local fc=TE.col(a.fillColor) if fc and fc[4]>.003 then B.bgR,B.bgG,B.bgB,B.bgA=fc[1],fc[2],fc[3],fc[4] end
+  TE.warnOnce("shape","CAShapeLayer paths are not supported (filled with its fill colour only)")
+ end
  reg[L.id]=L if L.name~="" and not reg["n:"..L.name] then reg["n:"..L.name]=L end
  local ak=kid(el,"animations")
  if ak then
   local list={}
   for _,an2 in ipairs(ak.kids) do
-   if an2.tag=="animation" then
-    local A=parseAnim(an2,L.id)
-    if A then list[#list+1]=A if A.imgs then L.needImg=true end end end end
+   if an2.a.keyPath or an2.tag=="animation" then
+    local A=TE.parseAnim(an2,L.id) if A then list[#list+1]=A end end end
   if #list>0 then L.anims=list end end
  if el.tag=="CAEmitterLayer" then
-  L.em={shape=a.emitterShape or "point",size=nums(a.emitterSize),cells={},mv=tonumber(a.velocity) or 1,mr=tonumber(a.birthRate) or 1,
-   ml=tonumber(a.lifetime) or 1,msc=tonumber(a.scale) or 1,msp=tonumber(a.spin) or 1,spd=tonumber(a.speed) or 1}
-  local ec=kid(el,"emitterCells")
-  if ec then for _,c in ipairs(ec.kids) do if c.tag=="CAEmitterCell" then
-   local ca=c.a local cc=kid(c,"contents")
-   local cell={rate=tonumber(ca.birthRate) or 0,life=tonumber(ca.lifetime) or 1,lifeR=tonumber(ca.lifetimeRange) or 0,
-    vel=tonumber(ca.velocity) or 0,velR=tonumber(ca.velocityRange) or 0,lon=tonumber(ca.emissionLongitude) or 0,
-    rng=tonumber(ca.emissionRange) or 0,sc=tonumber(ca.scale) or 1,scR=tonumber(ca.scaleRange) or 0,scS=tonumber(ca.scaleSpeed) or 0,
-    spin=tonumber(ca.spin) or 0,spinR=tonumber(ca.spinRange) or 0,rot=tonumber(ca.rotation) or 0,rotR=tonumber(ca.rotationRange) or 0,
-    aS=tonumber(ca.alphaSpeed) or 0,aR=tonumber(ca.alphaRange) or 0,ax=tonumber(ca.xAcceleration) or 0,ay=tonumber(ca.yAcceleration) or 0,
-    cs=tonumber(ca.contentsScale) or 1,en=(ca.enabled~="0")}
-   if cell.cs<=0 then cell.cs=1 end
-   if cc and cc.a.src then cell.img=dir.."/"..FP.rel(cc.a.src) end
-   if ca.color then local col=nums(ca.color) cell.col=Color3.new(col[1] or 1,col[2] or 1,col[3] or 1) end
-   L.em.cells[#L.em.cells+1]=cell end end end
+  local es=nums(a.emitterSize) local ep=nums(a.emitterPosition)
+  L.em={shape=a.emitterShape or "point",mode=a.emitterMode or "volume",size={es[1] or 0,es[2] or 0},pos={ep[1] or 0,ep[2] or 0},cells={},
+   mv=num(a.velocity,1),mr=num(a.birthRate,1),ml=num(a.lifetime,1),msc=num(a.scale,1),msp=num(a.spin,1),spd=num(a.speed,1),
+   seed=num(a.seed,0),render=a.renderMode or "unordered",beh={}}
+  local function cells(par,into)
+   local ec=kid(par,"emitterCells")
+   if not ec then return end
+   for _,c in ipairs(ec.kids) do if c.tag=="CAEmitterCell" then
+    local ca=c.a local cc=kid(c,"contents")
+    local cell={name=ca.name or "",rate=num(ca.birthRate,0),life=num(ca.lifetime,1),lifeR=num(ca.lifetimeRange,0),
+     vel=num(ca.velocity,0),velR=num(ca.velocityRange,0),lon=num(ca.emissionLongitude,0),rng=num(ca.emissionRange,0),
+     sc=num(ca.scale,1),scR=num(ca.scaleRange,0),scS=num(ca.scaleSpeed,0),spin=num(ca.spin,0),spinR=num(ca.spinRange,0),
+     rot=num(ca.rotation,0),rotR=num(ca.rotationRange,0),aS=num(ca.alphaSpeed,0),aR=num(ca.alphaRange,0),
+     ax=num(ca.xAcceleration,0),ay=num(ca.yAcceleration,0),cs=num(ca.contentsScale,1),en=(ca.enabled~="0"),
+     rR=num(ca.redRange,0),gR=num(ca.greenRange,0),bR=num(ca.blueRange,0),rS=num(ca.redSpeed,0),gS=num(ca.greenSpeed,0),bS=num(ca.blueSpeed,0),
+     bt=num(ca.beginTime,0),dur=num(ca.duration,math.huge),subs={}}
+    if math.abs(cell.bt)>1e5 then cell.bt=0 end
+    if cell.cs<=0 then cell.cs=1 end
+    local cr2=nums(ca.contentsRect) if #cr2>=4 and not (cr2[3]==1 and cr2[4]==1 and cr2[1]==0 and cr2[2]==0) then cell.crect=cr2 end
+    local csrc=TE.imgSrc(cc) if csrc then cell.img=dir.."/"..FP.rel(csrc) end
+    local col=ca.color and TE.col(ca.color) if not col then local ck=kid(c,"color") if ck then col=TE.col(ck.a.value,ck.a.opacity) end end
+    if col then cell.col={col[1],col[2],col[3]} cell.colA=col[4] end
+    into[#into+1]=cell
+    cells(c,cell.subs)
+   end end end
+  cells(el,L.em.cells)
+  local eb=kid(el,"emitterBehaviors")
+  if eb then for _,x in ipairs(eb.kids) do L.em.beh[#L.em.beh+1]=x.a end end
  end
  local sl=kid(el,"sublayers")
- if sl then for _,c in ipairs(sl.kids) do
-  if c.tag=="CALayer" or c.tag=="CAEmitterLayer" or c.tag=="CAGradientLayer" or c.tag=="CAShapeLayer" or c.tag=="CATextLayer" then
-   L.kids[#L.kids+1]=mkLayer(c,dir,reg) end end end
+ if sl then for _,c in ipairs(sl.kids) do if LAYER[c.tag] then L.kids[#L.kids+1]=TE.mkLayer(c,dir,reg,L) end end end
  return L end
 
-local function putv(tbl,id,key,val) tbl[id]=tbl[id] or {} tbl[id][key]=val end
-FP.subs=function(S_,reg,v)
- for _,c in ipairs(v.kids) do
-  if c.tag=="CALayer" and not c.a.object and c.a.name then
-   local T=reg["n:"..c.a.name]
-   if T then
-    local id,a=T.id,c.a
-    local p=nums(a.position) if #p>=2 then putv(S_.vals,id,"x",p[1]) putv(S_.vals,id,"y",p[2]) end
-    local b=nums(a.bounds) if #b>=4 then putv(S_.vals,id,"w",b[3]) putv(S_.vals,id,"h",b[4]) end
-    if a.transform then local rot,sx,sy=parseTf(a.transform) putv(S_.vals,id,"rot",rot) putv(S_.vals,id,"sx",sx) putv(S_.vals,id,"sy",sy) end
-    if a.opacity then putv(S_.vals,id,"op",tonumber(a.opacity) or 1) end
-   end end end end
-
-local function parseCA(dir)
+-- ---------- states / transitions ----------
+local function collect(n,tag,out)
+ for _,k in ipairs(n.kids) do if k.tag==tag then out[#out+1]=k else collect(k,tag,out) end end return out end
+TE.valEl=function(e) return kid(e,"value") end
+TE.parseCA=function(dir)
  FP.dir=dir
  local ok,s=pcall(readfile,dir.."/main.caml") if not ok or type(s)~="string" then return nil end
- local doc=xml(s) local caml=doc.kids[1] if not caml then return nil end
- local top=kid(caml,"CALayer") if not top then return nil end
- local reg={} local root=mkLayer(top,dir,reg)
+ local doc=TE.xml(s) local caml=doc.kids[1] if not caml then return nil end
+ local top
+ for _,k in ipairs(caml.kids) do if LAYER[k.tag] then top=k break end end
+ if not top then return nil end
+ local reg={} local root=TE.mkLayer(top,dir,reg,nil)
  local states={}
- local sn=deep(caml,"states")
- if sn then for _,st in ipairs(sn.kids) do if st.tag=="LKState" and st.a.name then
-  local S_={vals={},img={},anims={}}
+ for _,sn in ipairs(collect(caml,"states",{})) do for _,st in ipairs(sn.kids) do if st.tag=="LKState" and st.a.name then
+  local S_=states[st.a.name]
+  if not S_ then S_={name=st.a.name,based=st.a.basedOn,vals={},anims={},img={},subs={},cell={}} states[st.a.name]=S_ end
   local el=kid(st,"elements")
   if el then for _,e in ipairs(el.kids) do
    local tid,kp=e.a.targetId,e.a.keyPath
    if e.tag=="LKStateSetValue" and tid and kp then
     local v=kid(e,"value")
-    if v then
-     local val=v.a.value
-     if kp=="position" then local n=nums(val) if #n>=2 then putv(S_.vals,tid,"x",n[1]) putv(S_.vals,tid,"y",n[2]) end
-     elseif kp=="anchorPoint" then local n=nums(val) if #n>=2 then putv(S_.vals,tid,"ax",n[1]) putv(S_.vals,tid,"ay",n[2]) end
-     elseif kp=="contents" then if v.a.src then S_.img[tid]=FP.rel(v.a.src) if reg[tid] then reg[tid].needImg=true end end
-     elseif kp=="sublayers" then FP.subs(S_,reg,v)
-     elseif KP[kp] then
-      local n=tonumber(val)
-      if n then local m=KP[kp] for _,key in ipairs(m.k) do putv(S_.vals,tid,key,n*(m.mul or 1)) end end
-     end end
+    local m=TE.KP[kp]
+    if kp=="contents" then
+     local src=v and TE.imgSrc(v)
+     if src then S_.img[tid]=FP.rel(src) if reg[tid] then reg[tid].needImg=true end elseif not v or not next(v.a) then S_.img[tid]=false end
+    elseif kp=="sublayers" then
+     if v then local ids={} for _,x in ipairs(v.kids) do if x.a.object then ids[#ids+1]=x.a.object end end S_.subs[tid]=ids end
+    elseif kp:find("^emitterCells%.") then
+     local nm,pr=kp:match("^emitterCells%.(.-)%.([^%.]+)$")
+     if nm and v then
+      S_.cell[tid]=S_.cell[tid] or {}
+      if pr=="contents" then local src=TE.imgSrc(v) S_.cell[tid][nm.."."..pr]=src and FP.rel(src) or false
+      else local n=tonumber(v.a.value) if n then S_.cell[tid][nm.."."..pr]=n end end end
+    elseif EMK[kp] and v then S_.cell[tid]=S_.cell[tid] or {} S_.cell[tid][".."..kp]=tonumber(v.a.value)
+    elseif m and v then
+     local c=TE.pval(m,v)
+     if c then S_.vals[tid]=S_.vals[tid] or {} for i,key in ipairs(m.k) do S_.vals[tid][key]=c[i] end end
+    elseif not TE.IGN[kp] and not m then TE.UNK[kp.." (state value)"]=true end
    elseif e.tag=="LKStateAddAnimation" and tid then
     local an=kid(e,"animation")
     if an then
-     local A=parseAnim(an,tid)
-     if A then S_.anims[#S_.anims+1]=A if A.imgs and reg[tid] then reg[tid].needImg=true end end end
+     local A=TE.parseAnim(an,tid)
+     if A then A.key=e.a.key S_.anims[tid]=S_.anims[tid] or {}
+      local l=S_.anims[tid]
+      if A.key then for i=#l,1,-1 do if l[i].key==A.key then table.remove(l,i) end end end
+      l[#l+1]=A end end
    end end end
-  states[st.a.name]=S_ end end end
- return {root=root,reg=reg,states=states,res={}} end
+ end end end
+ local trans={}
+ for _,tn in ipairs(collect(caml,"stateTransitions",{})) do for _,tr in ipairs(tn.kids) do if tr.tag=="LKStateTransition" then
+  local T={from=tr.a.fromState or "*",to=tr.a.toState or "*",by={}}
+  local el=kid(tr,"elements")
+  if el then for _,e in ipairs(el.kids) do if e.tag=="LKStateTransitionElement" and e.a.targetId then
+   local an=kid(e,"animation")
+   local key=e.a.key or e.a.keyPath or (an and an.a.keyPath)
+   local m=key and TE.KP[key]
+   if m then
+    local sp=TE.trSpec(an,e)
+    T.by[e.a.targetId]=T.by[e.a.targetId] or {}
+    for _,ch in ipairs(m.k) do T.by[e.a.targetId][ch]=sp or {off=true} end
+   end end end end
+  trans[#trans+1]=T end end end
+ return {root=root,reg=reg,states=states,trans=trans,res={}} end
 
--- finds the Lock / Home / Sleep state for the current appearance (Light/Dark), tolerant with names
-local function pickState(states,base,mode)
+-- merged copy of a state following basedOn
+TE.flatten=function(states,S_,depth)
+ if not S_ or not S_.based or depth>6 or not states[S_.based] then return S_ end
+ local base=TE.flatten(states,states[S_.based],depth+1)
+ local M={name=S_.name,vals={},anims={},img={},subs={},cell={}}
+ for _,src in ipairs({base,S_}) do
+  for tid,v in pairs(src.vals) do M.vals[tid]=M.vals[tid] or {} for k,x in pairs(v) do M.vals[tid][k]=x end end
+  for tid,l in pairs(src.anims) do M.anims[tid]=l end
+  for tid,x in pairs(src.img) do M.img[tid]=x end
+  for tid,x in pairs(src.subs) do M.subs[tid]=x end
+  for tid,v in pairs(src.cell) do M.cell[tid]=M.cell[tid] or {} for k,x in pairs(v) do M.cell[tid][k]=x end end
+ end
+ return M end
+
+-- Lock / Home(Unlock) / Sleep state for the current appearance (Light/Dark); tolerant with names
+TE.pickState=function(ca,base,mode)
  local want=mode:lower() local other=(want=="dark") and "light" or "dark"
  local best,bestScore=nil,-1
- for name,s in pairs(states) do
+ for name,s in pairs(ca.states) do
   local l=name:lower()
   local ok
   if base=="lock" then ok=l:find("lock") and not l:find("unlock")
@@ -6760,25 +7077,455 @@ local function pickState(states,base,mode)
    if l:find("portrait") then sc=sc+1 end
    sc=sc-#l*.001
    if sc>bestScore then best,bestScore=s,sc end end end
+ if best then return TE.flatten(ca.states,best,0),best.name end
+ return nil end
+TE.findTr=function(ca,from,to)
+ local best,bs=nil,-1
+ for _,T in ipairs(ca.trans) do
+  local fm=(T.from==from) and 2 or ((T.from=="*") and 1 or nil)
+  local tm=(T.to==to) and 2 or ((T.to=="*") and 1 or nil)
+  if fm and tm and fm*10+tm>bs then best,bs=T,fm*10+tm end end
  return best end
+-- ---------- simulation (shared by the lock / home / aod views) ----------
+TE.CFG={implicit=.25,maxParticles=420,perEmitter=140,warmCap=8}
+local EMPTY={vals={},anims={},img={},subs={},cell={}}
+local floor,sqrt,cos,sin,abs,max,min=math.floor,math.sqrt,math.cos,math.sin,math.abs,math.max,math.min
+local function copy(t) local o={} for k,v in pairs(t) do o[k]=v end return o end
+-- tiny deterministic RNG
+local function rng(seed)
+ local s=(seed*2654435761+12345)%4294967296
+ return function() s=(s*1664525+1013904223)%4294967296 return s/4294967296 end end
 
-local EMPTY={vals={},img={},anims={}}
-local function resolveCA(ca,mode)
- local r=ca.res[mode]
- if not r then
-  r={home=pickState(ca.states,"home",mode) or EMPTY,lock=pickState(ca.states,"lock",mode) or EMPTY,sleep=pickState(ca.states,"sleep",mode) or EMPTY}
-  for _,k in ipairs({"home","lock","sleep"}) do
-   local by={} for _,A in ipairs(r[k].anims) do by[A.id]=by[A.id] or {} table.insert(by[A.id],A) end
-   r[k].by=by end
-  ca.res[mode]=r end
- return r end
+TE.build=function(pack,ca,fitW,fitH)
+ local inst={ca=ca,nodes={},byId={},ems={},now=0,t0=0,stateName=nil,stateObj=EMPTY,tracks=0,live=0}
+ local z=0
+ local function mk(L,parent)
+  local n={L=L,parent=parent,v=copy(L.base),cv=copy(L.base),tg=copy(L.base),dyn={},trk={},kidsCur={},baseKids={},sc=1}
+  z=z+1 n.z=z
+  n.clk=(parent and parent.clk0 or 0)-L.bt+L.to n.clk0=n.clk
+  inst.nodes[#inst.nodes+1]=n inst.byId[L.id]=n
+  local ks={} for i,c in ipairs(L.kids) do ks[i]={c,i} end
+  table.sort(ks,function(p1,p2) if p1[1].zp~=p2[1].zp then return p1[1].zp<p2[1].zp end return p1[2]<p2[2] end)
+  for _,e in ipairs(ks) do local c=mk(e[1],n) n.baseKids[#n.baseKids+1]=c n.kidsCur[#n.kidsCur+1]=c end
+  return n end
+ inst.root=mk(ca.root,nil)
+ -- dynamic channels
+ local function dynmark(tid,k) local n=inst.byId[tid] if n then n.dynset=n.dynset or {} n.dynset[k]=true end end
+ for _,n in ipairs(inst.nodes) do
+  if n.L.anims then for _,A in ipairs(n.L.anims) do for _,k in ipairs(A.keys) do dynmark(n.L.id,k) end end end
+  if n.L.needImg then n.needImg=true end end
+ for _,S_ in pairs(ca.states) do
+  for tid,vs in pairs(S_.vals) do for k in pairs(vs) do dynmark(tid,k) end end
+  for tid,l in pairs(S_.anims) do for _,A in ipairs(l) do for _,k in ipairs(A.keys) do dynmark(tid,k) end end end
+  for tid in pairs(S_.img) do local n=inst.byId[tid] if n then n.needImg=true end end
+ end
+ for _,n in ipairs(inst.nodes) do
+  n.dynl={} if n.dynset then for k in pairs(n.dynset) do n.dynl[#n.dynl+1]=k end end
+  local B=n.L.base
+  n.hasBg=(B.bgA>.003) or (n.dynset and (n.dynset.bgA or n.dynset.bgR) and true) or false
+  if n.L.em then
+   n.em={pl={},acc={},rnd=rng((n.L.em.seed or 0)+#inst.nodes*7+n.z),cellOv=nil,t=0}
+   inst.ems[#inst.ems+1]=n end
+ end
+ -- fit: aspect-fill the layer's own size onto the screen
+ local rb=ca.root.base local dw,dh=rb.w,rb.h
+ if dw<=0 or dh<=0 then dw,dh=pack.dw,pack.dh end
+ inst.rw,inst.rh=dw,dh
+ inst.fit=max(fitW/dw,fitH/dh)
+ inst.fw,inst.fh=fitW,fitH
+ inst.zmax=z
+ return inst end
 
+local function trackVal(tk,now)
+ local el=(now-tk.t0)
+ if el<0 then return tk.from,false end
+ local s=tk.spec
+ local p
+ if s.spring then
+  local tt=el*s.spd
+  if tt>=s.dur then return tk.to,true end
+  p=s.spring(tt)
+ else
+  local pp=el*s.spd/s.dur
+  if pp>=1 then return tk.to,true end
+  p=s.tf(pp) end
+ return tk.from+(tk.to-tk.from)*p,false end
+
+local DISC={hid=1}
+TE.enter=function(inst,sobj,sname,now,first)
+ local ca=inst.ca
+ sobj=sobj or EMPTY
+ local prevName=inst.stateName
+ inst.stateObj=sobj inst.stateName=sname inst.t0=now
+ local T=(not first) and TE.findTr(ca,prevName or "*",sname or "*") or nil
+ -- sublayer membership
+ local reparent,explicit={},{}
+ for tid,ids in pairs(sobj.subs) do
+  local pn=inst.byId[tid]
+  if pn then explicit[tid]=true for _,id in ipairs(ids) do local cn=inst.byId[id] if cn and cn~=pn then reparent[cn]=pn end end end end
+ for _,n in ipairs(inst.nodes) do n.kidsCur={} end
+ for _,n in ipairs(inst.nodes) do
+  local p=reparent[n] or n.parent
+  if p then
+   if reparent[n] or not explicit[p.L.id] then p.kidsCur[#p.kidsCur+1]=n end
+  end end
+ for tid,ids in pairs(sobj.subs) do
+  local pn=inst.byId[tid]
+  if pn then
+   local lst,seen={},{}
+   for _,id in ipairs(ids) do local cn=inst.byId[id] if cn and cn~=pn and not seen[cn] then seen[cn]=true lst[#lst+1]=cn end end
+   table.sort(lst,function(a,b) return a.z<b.z end)
+   pn.kidsCur=lst end end
+ -- sort kidsCur by z for all (keeps painter order)
+ for _,n in ipairs(inst.nodes) do if #n.kidsCur>1 then table.sort(n.kidsCur,function(a,b) return a.z<b.z end) end end
+ for _,n in ipairs(inst.nodes) do
+  local id=n.L.id
+  local sv=sobj.vals[id]
+  for _,k in ipairs(n.dynl) do
+   local tgt=(sv and sv[k]~=nil) and sv[k] or n.L.base[k]
+   n.tg[k]=tgt
+   if first or DISC[k] then n.cv[k]=tgt n.trk[k]=nil
+   elseif abs(tgt-n.cv[k])>1e-6 or n.trk[k] then
+    local spec=T and T.by[id] and T.by[id][k]
+    if spec and spec.off then n.cv[k]=tgt n.trk[k]=nil
+    else
+     if not spec then spec={dur=TE.CFG.implicit,begin=0,spd=1,tf=TE.NAMED.default} end
+     n.trk[k]={from=n.cv[k],to=tgt,t0=now+(spec.begin or 0),spec=spec} end end
+  end
+  -- image swap (discrete)
+  local im=sobj.img[id]
+  if im==nil then n.imgPath=n.L.img elseif im==false then n.imgPath=false else n.imgPath=n.L.dir.."/"..im end
+  n.cellOv=sobj.cell[id]
+  n.stAnims=sobj.anims[id]
+ end end
+
+TE.stateFor=function(inst,key,mode)
+ local ca=inst.ca
+ local ck=key.."|"..mode
+ local r=ca.res[ck]
+ if r==nil then local s,n=TE.pickState(ca,key,mode) r={s or false,n} ca.res[ck]=r end
+ return r[1] or nil,r[2] or ("("..key..")") end
+
+-- geometry + values for one instance at time `now`
+TE.calc=function(inst,n,pn,now)
+ local v=n.v
+ for _,k in ipairs(n.dynl) do
+  local tk=n.trk[k]
+  if tk then local val,done=trackVal(tk,now) n.cv[k]=val if done then n.trk[k]=nil n.cv[k]=tk.to end end
+  v[k]=n.cv[k] end
+ if n.L.anims or n.stAnims then
+  local function run(list,t)
+   for _,A in ipairs(list) do
+    local cur
+    if A.fromBase or A.add then cur={} for i,k in ipairs(A.keys) do cur[i]=v[k] end end
+    local out=TE.animEval(A,t,cur)
+    if out then for i,k in ipairs(A.keys) do if out[i] then v[k]=out[i] end end end
+   end end
+  if n.L.anims then run(n.L.anims,n.clk) end
+  if n.stAnims then run(n.stAnims,(now-inst.t0)*n.sc) end
+ end
+ if not pn then
+  local f=inst.fit
+  local rw,rh=v.w,v.h if rw<=0 then rw=inst.rw end if rh<=0 then rh=inst.rh end
+  n.ma,n.mb,n.mc,n.md=f,0,0,f
+  n.me,n.mf=inst.fw/2-f*rw/2,inst.fh/2-f*rh/2
+  n.eop=v.op n.hid=v.hid>.5 n.sc=v.spd
+ else
+  local pv=pn.v local down=pn.L.flip
+  local AX=v.x-pv.ox+v.tx
+  local ayr=v.y-pv.oy
+  local AY=down and (ayr+v.ty) or (pv.h-ayr-v.ty)
+  local bx=v.ax*v.w local by=(down and v.ay or (1-v.ay))*v.h
+  local th=(down and v.rot or -v.rot)*D2R
+  local c,s=cos(th),sin(th)
+  local sxx=v.sx*cos(v.ry*D2R) local syy=v.sy*cos(v.rx*D2R)
+  local la,lb,lc,ld=c*sxx,s*sxx,-s*syy,c*syy
+  local le,lf=AX-(la*bx+lc*by),AY-(lb*bx+ld*by)
+  local pa,pb,pc,pd=pn.ma,pn.mb,pn.mc,pn.md
+  n.ma=pa*la+pc*lb n.mb=pb*la+pd*lb n.mc=pa*lc+pc*ld n.md=pb*lc+pd*ld
+  n.me=pa*le+pc*lf+pn.me n.mf=pb*le+pd*lf+pn.mf
+  n.eop=pn.eop*v.op n.hid=pn.hid or v.hid>.5
+  n.sc=pn.sc*v.spd
+ end
+ return v end
+
+TE.walk=function(inst,n,pn,now,dt)
+ TE.calc(inst,n,pn,now)
+ n.clk=n.clk+dt*n.sc
+ for _,k in ipairs(n.kidsCur) do TE.walk(inst,k,n,now,dt) end end
+
+-- ---------- emitters ----------
+local function pickCellImg(n,c)
+ local ov=n.cellOv
+ if ov and ov[c.name..".contents"]~=nil then local p=ov[c.name..".contents"] if p then return n.L.dir.."/"..p end return nil end
+ return c.img end
+local function cellProp(n,c,k,def)
+ local ov=n.cellOv local v=ov and ov[c.name.."."..k]
+ if v~=nil then return v end return def end
+TE.spawn=function(inst,n,c,em,imgPath,w0,h0)
+ local E=n.em local r=E.rnd
+ local function rr(a) return (r()-.5)*2*a end
+ local ex,ey=em.pos[1],em.pos[2]
+ local sw,sh=em.size[1],em.size[2]
+ local shp=em.shape local mode=em.mode
+ if shp=="line" then
+  if mode=="outline" or mode=="surface" or mode=="points" then ex=ex+((r()<.5) and -sw/2 or sw/2) else ex=ex+(r()-.5)*sw end
+ elseif shp=="rectangle" or shp=="cuboid" then
+  if mode=="points" then ex=ex+((r()<.5) and -sw/2 or sw/2) ey=ey+((r()<.5) and -sh/2 or sh/2)
+  elseif mode=="outline" or mode=="surface" then
+   if r()<.5 then ex=ex+(r()-.5)*sw ey=ey+((r()<.5) and -sh/2 or sh/2) else ey=ey+(r()-.5)*sh ex=ex+((r()<.5) and -sw/2 or sw/2) end
+  else ex=ex+(r()-.5)*sw ey=ey+(r()-.5)*sh end
+ elseif shp=="circle" or shp=="sphere" then
+  local a=r()*6.2832 local rad=(sw/2)*((mode=="outline" or mode=="surface") and 1 or sqrt(r()))
+  ex=ex+cos(a)*rad ey=ey+sin(a)*rad end
+ local ang=c.lon+rr(c.rng)
+ local sp=(c.vel+rr(c.velR))*em.mv
+ local life=max(.05,(c.life+rr(c.lifeR))*em.ml)
+ local col=c.col or {1,1,1}
+ local p={cell=c,x=ex,y=ey,vx=cos(ang)*sp,vy=sin(ang)*sp,age=0,life=life,
+  rot=(c.rot+rr(c.rotR)),spin=(c.spin+rr(c.spinR))*em.msp,al=max(0,min(1,(c.colA or 1)+rr(c.aR))),
+  sc=max((c.sc+rr(c.scR))*em.msc,0),w=w0/c.cs,h=h0/c.cs,img=imgPath,
+  cr=max(0,min(1,col[1]+rr(c.rR))),cg=max(0,min(1,col[2]+rr(c.gR))),cb=max(0,min(1,col[3]+rr(c.bR)))}
+ E.pl[#E.pl+1]=p inst.live=inst.live+1 end
+TE.emStep=function(inst,n,dt,now,warm)
+ local em=n.L.em local E=n.em
+ local visible=not (n.hid or n.eop<=.01)
+ dt=dt*em.spd
+ E.t=E.t+dt
+ local dead={}
+ for i=#E.pl,1,-1 do
+  local p=E.pl[i] local c=p.cell
+  p.age=p.age+dt
+  if p.age>=p.life or not visible then
+   p.dead=true table.remove(E.pl,i) inst.live=inst.live-1
+  else
+   p.vx=p.vx+c.ax*dt p.vy=p.vy+c.ay*dt p.x=p.x+p.vx*dt p.y=p.y+p.vy*dt
+   p.rot=p.rot+p.spin*dt p.al=max(0,min(1,p.al+c.aS*dt)) p.sc=p.sc+c.scS*dt
+   if c.rS~=0 then p.cr=max(0,min(1,p.cr+c.rS*dt)) end
+   if c.gS~=0 then p.cg=max(0,min(1,p.cg+c.gS*dt)) end
+   if c.bS~=0 then p.cb=max(0,min(1,p.cb+c.bS*dt)) end
+  end end
+ if not visible then return end
+ local ov=n.cellOv
+ local mr=em.mr local mvl=em.ml
+ if ov then mr=ov["..birthRate"] or mr end
+ local capAll=TE.CFG.maxParticles
+ for ci,c in ipairs(em.cells) do
+  local img=pickCellImg(n,c)
+  local en=c.en
+  local rate=cellProp(n,c,"birthRate",c.rate)
+  local te=E.t-c.bt
+  if img and en and rate>0 and te>=0 and te<=c.dur then
+   E.acc[ci]=(E.acc[ci] or 0)+rate*mr*dt
+   local w0,h0=TE.imgSize(img)
+   if c.crect then w0=w0*c.crect[3] h0=h0*c.crect[4] end
+   while E.acc[ci]>=1 do
+    E.acc[ci]=E.acc[ci]-1
+    local room=(inst.live<capAll*.8) or (E.rnd()<max(0,(capAll-inst.live)/(capAll*.2)))
+    if room and #E.pl<TE.CFG.perEmitter then TE.spawn(inst,n,c,em,img,w0,h0) end
+   end end
+ end end
+
+-- one full frame of an instance
+TE.step=function(inst,dt,key,mode,now)
+ inst.now=now
+ local sobj,sname=TE.stateFor(inst,key,mode)
+ if sname~=inst.stateName then TE.enter(inst,sobj,sname,now,inst.stateName==nil) end
+ TE.walk(inst,inst.root,nil,now,dt)
+ for _,n in ipairs(inst.ems) do TE.emStep(inst,n,dt,now) end end
+
+-- pre-simulate emitters so effects look mature from the first frame (layer beginTime < 0)
+TE.warm=function(inst,key,mode,now)
+ local w=0
+ for _,n in ipairs(inst.ems) do w=max(w,n.clk0) end
+ w=min(w,TE.CFG.warmCap)
+ local t=-w
+ TE.step(inst,0,key,mode,now-w)
+ while t<-.0001 do TE.step(inst,.1,key,mode,now+t) t=t+.1 end end
+-- ---------- views (Roblox objects) ----------
+local deg,atan2=math.deg,math.atan2
+local D2R=math.pi/180
+local function gravScale(g)
+ if g=="resize" then return Enum.ScaleType.Stretch end
+ if g=="resizeAspectFill" then return Enum.ScaleType.Crop end
+ return Enum.ScaleType.Fit end
+TE.makeView=function(par,insts)
+ local holder=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,ClipsDescendants=true,ZIndex=1,BorderSizePixel=0},par)
+ local view={holder=holder,vis={},frame=0}
+ local zb=0
+ for _,inst in ipairs(insts) do
+  view.vis[#view.vis+1]={inst=inst,o={},clip={},mark={},pl={},seen={},pool={},dec={},zb=zb}
+  zb=zb+inst.zmax+2 end
+ return view end
+
+local function place(ctx,X,Y)
+ if ctx.th==0 then return UDim2.fromOffset(X-ctx.x,Y-ctx.y) end
+ local dx,dy=X-ctx.cx,Y-ctx.cy
+ local c,s=math.cos(-ctx.th),math.sin(-ctx.th)
+ return UDim2.fromOffset(dx*c-dy*s+ctx.w/2,dx*s+dy*c+ctx.h/2) end
+local function setParent(o,p) if o.Parent~=p then o.Parent=p end end
+local function ensureMain(vi,n,holder)
+ local o=vi.o[n]
+ if o~=nil then return o or nil end
+ local L=n.L
+ local z=vi.zb+n.z
+ if L.text then
+  o=new("TextLabel",{BackgroundTransparency=1,BorderSizePixel=0,AnchorPoint=Vector2.new(.5,.5),ZIndex=z,Visible=false,Text=L.text.s,
+   TextColor3=Color3.new(L.text.col[1],L.text.col[2],L.text.col[3]),TextWrapped=L.text.wrap,TextYAlignment=Enum.TextYAlignment.Top,
+   TextXAlignment=(L.text.al=="center") and XC or ((L.text.al=="right") and XR or XL),TextSize=14},holder)
+  if FACE[F_M] then o.FontFace=FACE[F_M] end
+ elseif L.img or n.needImg then
+  o=new("ImageLabel",{BackgroundTransparency=1,BorderSizePixel=0,ScaleType=gravScale(L.grav),AnchorPoint=Vector2.new(.5,.5),ZIndex=z,Image="",Visible=false},holder)
+  o:SetAttribute("img","")
+ elseif n.hasBg or L.grad then
+  o=new("Frame",{BorderSizePixel=0,AnchorPoint=Vector2.new(.5,.5),ZIndex=z,Visible=false,BackgroundColor3=Color3.new(1,1,1)},holder)
+  if L.grad then
+   local g=L.grad local cs,ts={},{}
+   local nn=#g.cols
+   for i,c in ipairs(g.cols) do
+    local t=g.locs[i] or ((i-1)/(nn-1))
+    if i>1 and t<=cs[#cs].Time then t=math.min(1,cs[#cs].Time+.0001) end
+    cs[#cs+1]=ColorSequenceKeypoint.new(math.clamp(t,0,1),Color3.new(c[1],c[2],c[3]))
+    ts[#ts+1]=NumberSequenceKeypoint.new(math.clamp(t,0,1),1-c[4]) end
+   cs[1]=ColorSequenceKeypoint.new(0,cs[1].Value) ts[1]=NumberSequenceKeypoint.new(0,ts[1].Value)
+   cs[#cs]=ColorSequenceKeypoint.new(1,cs[#cs].Value) ts[#ts]=NumberSequenceKeypoint.new(1,ts[#ts].Value)
+   local sp,ep=g.sp,g.ep
+   local dx,dy=(ep[1] or .5)-(sp[1] or .5),(ep[2] or 1)-(sp[2] or 0)
+   local pdown=n.parent and n.parent.L.flip
+   if not pdown then dy=-dy end
+   new("UIGradient",{Color=ColorSequence.new(cs),Transparency=NumberSequence.new(ts),Rotation=deg(atan2(dy,dx))},o) end
+ else o=false end
+ vi.o[n]=o
+ return o or nil end
+
+local function ensureClip(vi,n,holder,rotated)
+ local c=vi.clip[n]
+ if c~=nil then return c or nil end
+ if not n.L.mask then vi.clip[n]=false return nil end
+ local cls=((n.L.base.cr>.5) or rotated) and "CanvasGroup" or "Frame"
+ c=new(cls,{BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,AnchorPoint=Vector2.new(.5,.5),ZIndex=vi.zb+n.z,Visible=false},holder)
+ vi.clip[n]=c return c end
+
+local function tintOf(v)
+ local r,g,b=v.tnR,v.tnG,v.tnB
+ if v.m1 then r=r*math.clamp(v.m1,0,1) g=g*math.clamp(v.m7,0,1) b=b*math.clamp(v.m13,0,1) end
+ return Color3.new(math.clamp(r,0,1),math.clamp(g,0,1),math.clamp(b,0,1)) end
+
+TE.paintNode=function(view,vi,n,ctx,holder,fr)
+ local L,v=n.L,n.v
+ vi.mark[n]=fr
+ local vis=(not n.hid) and n.eop>.003
+ local cw,ch=v.w,v.h
+ local a,b,c,d,e,f=n.ma,n.mb,n.mc,n.md,n.me,n.mf
+ local sx=math.sqrt(a*a+b*b)
+ local sy=(sx>1e-9) and (a*d-b*c)/sx or 0
+ local rot=(sx>1e-9) and deg(atan2(b,a)) or 0
+ local cxs,cys=a*cw/2+c*ch/2+e,b*cw/2+d*ch/2+f
+ local nctx=ctx
+ if vis and L.mask then
+  local rotated=math.abs(rot)>.05
+  local cf=ensureClip(vi,n,holder,rotated)
+  if cf and sx>1e-6 and sy>1e-6 and cw>0 and ch>0 and (not rotated or cf:IsA("CanvasGroup")) then
+   setParent(cf,ctx.frame)
+   cf.Position=place(ctx,cxs,cys) cf.Size=UDim2.fromOffset(cw*sx,ch*sy) cf.Rotation=rot-(ctx.rd or 0) cf.Visible=true
+   if cf:IsA("CanvasGroup") then
+    local dc=vi.dec[cf] if not dc then dc={c=new("UICorner",{},cf)} vi.dec[cf]=dc end dc.c.CornerRadius=UDim.new(0,v.cr*sx) end
+   nctx={frame=cf,th=rot*D2R,rd=rot,cx=cxs,cy=cys,w=cw*sx,h=ch*sy,x=cxs-cw*sx/2,y=cys-ch*sy/2}
+  elseif cf then cf.Visible=false end end
+ local o=ensureMain(vi,n,holder)
+ if o then
+  if vis and cw>0 and ch>0 then
+   setParent(o,ctx.frame)
+   o.Visible=true
+   o.Position=place(ctx,cxs,cys)
+   o.Size=UDim2.fromOffset(cw*sx,ch*sy)
+   o.Rotation=rot-(ctx.rd or 0)
+   if L.text then
+    o.TextSize=math.clamp(math.floor(L.text.size*math.max(sx,.01)+.5),1,100)
+    o.TextTransparency=1-n.eop
+   else
+    local isImg=o:IsA("ImageLabel")
+    if isImg then
+     local path=n.imgPath
+     if (path or "")~=o:GetAttribute("img") then
+      o:SetAttribute("img",path or "")
+      o.Image=(path and TE.asset(path)) or ""
+      if path and L.crect then
+       local iw,ih=TE.imgSize(path)
+       o.ImageRectOffset=Vector2.new(L.crect[1]*iw,L.crect[2]*ih) o.ImageRectSize=Vector2.new(L.crect[3]*iw,L.crect[4]*ih) end
+     end
+     local ta=(v.tnA or 1)
+     if v.m19 then ta=ta*math.clamp(v.m19,0,1) end
+     o.ImageTransparency=1-math.clamp(n.eop*ta,0,1)
+     o.ImageColor3=tintOf(v)
+     if L.grav=="center" and n.imgPath then
+      local iw,ih=TE.imgSize(n.imgPath) o.ScaleType=Enum.ScaleType.Stretch
+      o.Size=UDim2.fromOffset(iw/L.cs*sx,ih/L.cs*sy) end
+    end
+    if n.hasBg then
+     o.BackgroundColor3=Color3.new(math.clamp(v.bgR,0,1),math.clamp(v.bgG,0,1),math.clamp(v.bgB,0,1))
+     o.BackgroundTransparency=1-math.clamp(n.eop*v.bgA,0,1) end
+    if L.grad then o.BackgroundTransparency=1-n.eop end
+   end
+   local r=v.cr*sx
+   local dec=vi.dec[o]
+   if r>.5 or (v.bw>0 and v.bcA>.003) or dec then
+    if not dec then dec={} vi.dec[o]=dec end
+    if r>.5 then if not dec.c then dec.c=new("UICorner",{},o) end dec.c.CornerRadius=UDim.new(0,r) elseif dec.c then dec.c:Destroy() dec.c=nil end
+    if v.bw>0 and v.bcA>.003 then
+     if not dec.s then dec.s=new("UIStroke",{},o) end
+     dec.s.Thickness=v.bw*sx dec.s.Color=Color3.new(v.bcR,v.bcG,v.bcB) dec.s.Transparency=1-math.clamp(v.bcA*n.eop,0,1)
+    elseif dec.s then dec.s:Destroy() dec.s=nil end
+   end
+  else o.Visible=false end
+ end
+ -- particles
+ if n.em then
+  local E=n.em
+  for _,p in ipairs(E.pl) do
+   local lab=vi.pl[p]
+   if not lab then
+    lab=table.remove(vi.pool) or new("ImageLabel",{BackgroundTransparency=1,BorderSizePixel=0,AnchorPoint=Vector2.new(.5,.5),ScaleType=Enum.ScaleType.Stretch},holder)
+    vi.pl[p]=lab
+    lab.Image=TE.asset(p.img) or ""
+    local cr=p.cell.crect
+    if cr then local iw,ih=TE.imgSize(p.img) lab.ImageRectOffset=Vector2.new(cr[1]*iw,cr[2]*ih) lab.ImageRectSize=Vector2.new(cr[3]*iw,cr[4]*ih)
+    else lab.ImageRectOffset=Vector2.new(0,0) lab.ImageRectSize=Vector2.new(0,0) end
+   end
+   vi.seen[p]=fr
+   local own=L.flip
+   local lx=p.x-v.ox
+   local ly=own and (p.y-v.oy) or (v.h-(p.y-v.oy))
+   local s=math.max(p.sc,0)
+   if s<=.0005 or not vis then lab.Visible=false
+   else
+    setParent(lab,ctx.frame)
+    lab.Visible=true lab.ZIndex=vi.zb+n.z
+    lab.Position=place(ctx,a*lx+c*ly+e,b*lx+d*ly+f)
+    lab.Size=UDim2.fromOffset(p.w*s*sx,p.h*s*math.abs(sy))
+    lab.Rotation=rot-(ctx.rd or 0)+((own and p.rot or -p.rot)*57.29578)
+    lab.ImageTransparency=1-math.clamp(p.al*n.eop,0,1)
+    lab.ImageColor3=Color3.new(p.cr,p.cg,p.cb)
+   end
+  end
+ end
+ for _,k in ipairs(n.kidsCur) do TE.paintNode(view,vi,k,nctx,holder,fr) end end
+
+TE.paintView=function(view)
+ view.frame=view.frame+1 local fr=view.frame
+ for _,vi in ipairs(view.vis) do
+  TE.paintNode(view,vi,vi.inst.root,{frame=view.holder,x=0,y=0,th=0,rd=0},view.holder,fr)
+  for n,o in pairs(vi.o) do if o and vi.mark[n]~=fr then o.Visible=false end end
+  for n,c in pairs(vi.clip) do if c and vi.mark[n]~=fr then c.Visible=false end end
+  for p,lab in pairs(vi.pl) do
+   if p.dead or vi.seen[p]~=fr then lab.Visible=false vi.pl[p]=nil vi.pool[#vi.pool+1]=lab end end
+ end end
+-- ---------- pack discovery ----------
 local function rank(n) n=n:lower()
  if n:find("background") then return 1 elseif n:find("floating") then return 2 elseif n:find("foreground") then return 3 end return 2 end
 local function isCA(p)
  if p:lower():match("%.ca$") then return true end
  local ok,r=pcall(isfile,p.."/main.caml") return ok and r and true or false end
--- searches any depth (iPhone 16 Pro style: Container/Library/Application Support/.../descriptors/<UUID>/versions/0/contents/*.ca)
 local function walk(dir,depth,out)
  if depth>40 then return end
  local ok,list=pcall(listfiles,dir) if not ok then return end
@@ -6787,13 +7534,11 @@ local function walk(dir,depth,out)
   elseif isfolder(p) then
    if isCA(p) then out[#out+1]=p else walk(p,depth+1,out) end
   elseif p:lower():match("%.tendies$") then
-   warn("[iOS18] Found "..p..": a .tendies file is a ZIP. Rename it to .zip, extract it, and move the extracted folder into "..ROOT.."/wallpapers/") end
+   warn("[iOS18] Found "..p..": .tendies files are read directly when placed in "..ROOT.."/wallpapers/") end
  end end
-
 local function addPack(top,name)
  local cas={} walk(top,0,cas)
  if #cas==0 then warn("[iOS18] '"..name.."': no .ca layer folders (main.caml) found inside it.") return end
- -- one wallpaper per descriptor (a .tendies can hold several), using the best folder of layers
  local groups,order={},{}
  for _,c in ipairs(cas) do
   local parent=c:match("^(.*)[/\\][^/\\]+$") or c
@@ -6813,16 +7558,16 @@ local function addPack(top,name)
   table.sort(mine,function(a2,b2) return rank(a2)<rank(b2) end)
   local list={}
   for _,c in ipairs(mine) do
-   local ok,ca=pcall(parseCA,c)
+   local ok,ca=pcall(TE.parseCA,c)
    if ok and ca then ca.dir=c list[#list+1]=ca elseif not ok then warn("[iOS18] "..c..": "..tostring(ca)) end end
   if #list==0 then warn("[iOS18] No readable layers in "..name) else
    local dw,dh=(parent or ""):match("(%d+)w%-(%d+)h")
    dw=tonumber(dw) or W dh=tonumber(dh) or H
    local pname=(#order>1) and (name.." "..di) or name
    local id=pname:gsub("%W","_")
-   packs[#packs+1]={id=id,name=pname,cas=list,dw=dw,dh=dh}
-   table.insert(X.CAT,{id="lw_"..id,name="Live: "..pname,author="Tendies",ver="1.0.0",sec="Animations",col=TEAL,
-    desc="Animated wallpaper from a .tendies file.",long="Animated wallpaper with Lock, Home and Sleep states, Light/Dark variants, keyframe animations and particle emitters."})
+   TE.packs[#TE.packs+1]={id=id,name=pname,cas=list,dw=dw,dh=dh}
+   table.insert(X.CAT,{id="lw_"..id,name="Live: "..pname,author="Tendies",ver="2.0.0",sec="Animations",col=TEAL,
+    desc="Animated wallpaper from a .tendies file.",long="Animated wallpaper with Lock, Home and Sleep states, Light/Dark variants, state transitions, keyframe animations and particle emitters."})
    local sn={} for k in pairs(list[1].states) do sn[#sn+1]=k end table.sort(sn)
    local rb=list[1].root.base
    print("[iOS18] Loaded live wallpaper '"..pname.."' ("..#list.." layer sets, root "..rb.w.."x"..rb.h..", states: "..(#sn>0 and table.concat(sn,", ") or "none")..")") end
@@ -6830,14 +7575,14 @@ local function addPack(top,name)
 
 X.unzipTendies=function(p,dest)
  local data=readfile(p)
- local mark=dest.."/_ok.txt"
+ local mark=dest.."/_ok2.txt"
  local okm,ex=pcall(isfile,mark)
  if okm and ex then local okr,v=pcall(readfile,mark) if okr and v==tostring(#data) then return true end end
  FP.mkdirs(dest)
  local n=0
  FP.unzip(data,function(name,bytes)
   if name:find("__MACOSX",1,true) or name:find("%.DS_Store$") or name:match("[^/]*$"):sub(1,2)=="._" then return end
-  local rp=FP.san(name)
+  local rp=FP.san(name:gsub("\\","/"))
   if ("/"..rp.."/"):find("/%.%./") then return end
   local full=dest.."/"..rp
   local dir=full:match("^(.*)/[^/]+$") if dir then FP.mkdirs(dir) end
@@ -6849,259 +7594,58 @@ if FS and GA then
  FP.mkdirs(ROOT.."/tendies_cache")
  for _,p in ipairs(listfiles(ROOT.."/wallpapers")) do
   if isfolder(p) then addPack(p,p:match("([^/\\]+)$"))
-  elseif p:lower():match("%.tendies$") then
-   local nm=((p:match("([^/\\]+)$") or "tendies"):gsub("%.[Tt][Ee][Nn][Dd][Ii][Ee][Ss]$",""))
+  elseif p:lower():match("%.tendies$") or p:lower():match("%.zip$") then
+   local nm=((p:match("([^/\\]+)$") or "tendies"):gsub("%.[%a]+$",""))
    local dest=ROOT.."/tendies_cache/"..FP.san(nm)
    local ok,err=pcall(X.unzipTendies,p,dest)
    if ok then addPack(dest,nm) else warn("[iOS18] Could not open "..p..": "..tostring(err)) end end end
 elseif FS then warn("[iOS18] This executor has no getcustomasset: live wallpapers are disabled.") end
-do local u={} for k in pairs(UNK) do u[#u+1]=k end table.sort(u)
+do local u={} for k in pairs(TE.UNK) do u[#u+1]=k end table.sort(u)
  if #u>0 then print("[iOS18] Animation types not supported by the engine (ignored): "..table.concat(u,", ")) end end
 
--- ===== RENDERER =====
-local D2R=math.pi/180
-local KEYS={"x","y","w","h","ax","ay","op","rot","sx","sy","tx","ty"}
-local function lv(a,b,f) if type(a)=="table" then return {a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f} end return a+(b-a)*f end
--- t = seconds since the animation's owner started; returns nil when the animation is not in effect (CoreAnimation rules)
-local function animEval(A,t)
- local lt=(t-A.begin)*A.spd+A.toff
- if lt<0 then if A.back then lt=0 else return nil end end
- local cyc=lt/A.dur
- if cyc>=A.tot then
-  if not A.hold then return nil end
-  cyc=A.tot end
- local ph
- if A.ar then local m=cyc%2 ph=(m<=1) and m or (2-m)
- else ph=cyc%1 if cyc>0 and ph==0 and cyc>=A.tot then ph=1 end end
- local kt=A.kt local n=A.imgs and #A.imgs or #A.vals
- if A.imgs or A.disc then
-  local k=1 for i=1,n do if ph>=kt[i] then k=i end end
-  if A.imgs then return k end
-  return A.vals[k] end
- local vals=A.vals
- if ph<=kt[1] then return vals[1] end
- for i=1,n-1 do
-  if ph<=kt[i+1] then local f=(ph-kt[i])/math.max(kt[i+1]-kt[i],1e-6) return lv(vals[i],vals[i+1],f) end end
- return vals[n] end
-local function applyAnim(n,A,t)
- local val=animEval(A,t)
- if val==nil then return end
- if A.imgs then n.seq=A.imgs[val] return end
- local v=n.v
- if type(val)=="table" then v[A.keys[1]]=val[1] v[A.keys[2]]=val[2]
- else val=val*A.mul for _,key in ipairs(A.keys) do v[key]=val end end end
-
-local function gravScale(g)
- g=tostring(g or "resize")
- if g=="resize" then return Enum.ScaleType.Stretch end
- if g=="resizeAspectFill" then return Enum.ScaleType.Crop end
- return Enum.ScaleType.Fit end
-local function buildCA(holder,ca,zb)
- local inst={ca=ca,nodes={},ems={},holder=holder,live=0,z=zb,t0=os.clock(),st={}}
- local function mk(L,parent)
-  local n={L=L,parent=parent,kids={},v={}}
-  inst.z=inst.z+1 n.z=inst.z
-  if L.img or L.needImg then
-   n.o=new("ImageLabel",{BackgroundTransparency=1,BorderSizePixel=0,ScaleType=gravScale(L.grav),AnchorPoint=Vector2.new(.5,.5),
-    ZIndex=n.z,Image=(L.img and asset(L.img)) or "",Visible=false},holder)
-   n.curImg=L.img
-   if L.bg then n.o.BackgroundColor3=L.bg end
-  elseif L.bg then
-   n.o=new("Frame",{BorderSizePixel=0,AnchorPoint=Vector2.new(.5,.5),ZIndex=n.z,BackgroundColor3=L.bg,Visible=false},holder) end
-  if L.em then n.em={pl={},acc={},free={}} inst.ems[#inst.ems+1]=n end
-  inst.nodes[#inst.nodes+1]=n
-  local ks={} for i,c in ipairs(L.kids) do ks[i]={c,i} end
-  table.sort(ks,function(p1,p2) if p1[1].zp~=p2[1].zp then return p1[1].zp<p2[1].zp end return p1[2]<p2[2] end)
-  for _,e in ipairs(ks) do n.kids[#n.kids+1]=mk(e[1],n) end
-  return n end
- inst.root=mk(ca.root,nil)
- return inst end
-
-local function calc(n,pn,fit)
- local v=n.v
- if not pn then
-  n.cx,n.cy=W/2,H/2 n.ax,n.ay=n.cx,n.cy n.sx,n.sy=fit*v.sx,fit*v.sy n.th=v.rot n.eop=v.op n.hid=v.hid>.5
- else
-  local pL,pv=pn.L,pn.v
-  local flip=pL.flip
-  local px,py=v.x-pL.ox,v.y-pL.oy
-  local ay=v.ay
-  if flip then py=pv.h-py ay=1-ay end
-  px=px+v.tx py=py+(flip and -v.ty or v.ty)
-  local dx,dy=(px-pv.w/2)*pn.sx,(py-pv.h/2)*pn.sy
-  local c,s=math.cos(pn.th*D2R),math.sin(pn.th*D2R)
-  n.ax,n.ay=pn.cx+dx*c-dy*s,pn.cy+dx*s+dy*c
-  n.sx,n.sy=pn.sx*v.sx,pn.sy*v.sy
-  n.th=pn.th+(flip and -v.rot or v.rot)
-  local c2,s2=math.cos(n.th*D2R),math.sin(n.th*D2R)
-  local ox2,oy2=(.5-v.ax)*v.w*n.sx,(.5-ay)*v.h*n.sy
-  n.cx,n.cy=n.ax+ox2*c2-oy2*s2,n.ay+ox2*s2+oy2*c2
-  n.eop=pn.eop*v.op n.hid=pn.hid or v.hid>.5
- end
- for _,k in ipairs(n.kids) do calc(k,n,fit) end end
-
-local function paint(inst,n,R,dom)
- local o=n.o if not o then return end
- local v=n.v
- if n.hid or n.eop<=.003 or v.w<=0 or v.h<=0 then o.Visible=false return end
- o.Visible=true
- o.Position=UDim2.fromOffset(n.cx,n.cy)
- o.Size=UDim2.fromOffset(math.abs(v.w*n.sx),math.abs(v.h*n.sy))
- o.Rotation=n.th
- local t=1-math.clamp(n.eop,0,1)
- local bt=1-math.clamp(n.eop*(n.L.bgA or 1),0,1)
- if n.L.img or n.L.needImg then
-  o.ImageTransparency=t if n.L.bg then o.BackgroundTransparency=bt end
-  local id=n.L.id local sw=id and R[dom].img[id]
-  local path=(n.seq and (inst.ca.dir.."/"..n.seq)) or (sw and (inst.ca.dir.."/"..sw)) or n.L.img
-  if path~=n.curImg then n.curImg=path o.Image=(path and asset(path)) or "" end
- else o.BackgroundTransparency=bt end end
-
-local function spawn(inst,n,c,em)
- local E=n.em
- local o=table.remove(E.free)
- if not o then o=new("ImageLabel",{BackgroundTransparency=1,BorderSizePixel=0,AnchorPoint=Vector2.new(.5,.5),ScaleType=Enum.ScaleType.Stretch},inst.holder) end
- local iw,ih=imgSize(c.img)
- local r=math.random
- local function rr(a) return (r()-.5)*2*a end
- local size=em.size local ox,oy=0,0
- local sh=em.shape
- if sh=="line" or sh=="rectangle" or sh=="cuboid" then ox=(r()-.5)*(size[1] or 0) oy=(r()-.5)*(size[2] or 0)
- elseif sh=="circle" or sh=="sphere" then local a=r()*6.2832 local rad=math.sqrt(r())*((size[1] or 0)/2) ox=math.cos(a)*rad oy=math.sin(a)*rad end
- local ang=c.lon+(r()-.5)*c.rng
- local sp=(c.vel+rr(c.velR))*em.mv
- o.ZIndex=n.z o.Image=asset(c.img) or "" o.ImageColor3=c.col or Color3.new(1,1,1) o.Visible=true
- E.pl[#E.pl+1]={cell=c,o=o,age=0,life=math.max(.05,(c.life+rr(c.lifeR))*em.ml),x=ox,y=oy,vx=math.cos(ang)*sp,vy=math.sin(ang)*sp,
-  rot=(c.rot+rr(c.rotR))*57.29578,spin=(c.spin+rr(c.spinR))*57.29578*em.msp,al=math.clamp(1+rr(c.aR),0,1),
-  sc=math.max((c.sc+rr(c.scR))*em.msc,0),w=iw/c.cs,h=ih/c.cs}
- inst.live=inst.live+1 end
-
-local function emStep(inst,n,dt)
- local em=n.L.em local E=n.em
- dt=dt*em.spd
- local hidden=n.hid or n.eop<=.01
- local th=n.th*D2R local ct,st=math.cos(th),math.sin(th)
- for i=#E.pl,1,-1 do
-  local p=E.pl[i] local c=p.cell
-  p.age=p.age+dt
-  if p.age>=p.life or hidden then
-   p.o.Visible=false table.remove(E.pl,i) E.free[#E.free+1]=p.o inst.live=inst.live-1
-  else
-   p.vx=p.vx+c.ax*dt p.vy=p.vy+c.ay*dt p.x=p.x+p.vx*dt p.y=p.y+p.vy*dt
-   p.rot=p.rot+p.spin*dt p.al=math.clamp(p.al+c.aS*dt,0,1) p.sc=p.sc+c.scS*dt
-   local lx,ly=p.x*n.sx,p.y*n.sy
-   local s=math.max(p.sc,0)
-   p.o.Position=UDim2.fromOffset(n.ax+lx*ct-ly*st,n.ay+lx*st+ly*ct)
-   p.o.Size=UDim2.fromOffset(p.w*s*math.abs(n.sx),p.h*s*math.abs(n.sy))
-   p.o.Rotation=n.th+p.rot
-   p.o.ImageTransparency=1-math.clamp(p.al*n.eop,0,1)
-  end end
- if hidden then return end
- for ci,c in ipairs(em.cells) do
-  if c.img and c.en and c.rate>0 then
-   E.acc[ci]=(E.acc[ci] or 0)+c.rate*em.mr*dt
-   while E.acc[ci]>=1 do
-    E.acc[ci]=E.acc[ci]-1
-    if #E.pl<40 and inst.live<150 then spawn(inst,n,c,em) end
-   end end end end
-
-local function stepInst(inst,dt,p,wS,mode,now)
- local ca=inst.ca local R=resolveCA(ca,mode)
- local wL=(1-wS)*p local wH=(1-wS)*(1-p)
- local dom=(wS>.5) and "sleep" or ((p>=.5) and "lock" or "home")
- -- state animations restart every time their state becomes the active one (like on a real device)
- if inst.dom~=dom then inst.dom=dom inst.st[dom]=now end
- local tS=now-(inst.st[dom] or inst.t0) local tL=now-inst.t0
- local ha,lo,sl=R.home.vals,R.lock.vals,R.sleep.vals
- local dv=(dom=="lock" and lo) or (dom=="home" and ha) or sl
- local by=R[dom].by
- for _,n in ipairs(inst.nodes) do
-  local L=n.L local b=L.base local v=n.v local id=L.id
-  local a,c,d=id and ha[id],id and lo[id],id and sl[id]
-  for i=1,12 do
-   local k=KEYS[i] local bv=b[k]
-   local vh,vl,vs=bv,bv,bv
-   if a and a[k]~=nil then vh=a[k] end
-   if c and c[k]~=nil then vl=c[k] end
-   if d and d[k]~=nil then vs=d[k] end
-   v[k]=wH*vh+wL*vl+wS*vs end
-  local ds=id and dv[id]
-  v.hid=(ds and ds.hid) or b.hid
-  n.seq=nil
-  local list=id and by[id]
-  if list then for _,A in ipairs(list) do applyAnim(n,A,tS) end end
-  if L.anims then for _,A in ipairs(L.anims) do applyAnim(n,A,tL) end end
- end
- calc(inst.root,nil,inst.fit)
- for _,n in ipairs(inst.nodes) do paint(inst,n,R,dom) end
- for _,n in ipairs(inst.ems) do emStep(inst,n,dt) end end
-
-
--- ===== INSTANCES =====
-local cur={}
-local lastPack,lastMode,lastSp,lastWS
-local sp,wS,tacc,pacc=0,0,0,0
-local function activePack() for _,p in ipairs(packs) do if X.tweakOn("lw_"..p.id) then return p end end end
--- how far the lock screen is from being fully shown (1 = locked, 0 = gone). It follows the swipe (lockIn),
--- the notification-centre slide (lockL) and the unlock animation, so Lock -> Home states animate with the gesture
-local function progress()
- if not lockL.Visible then return 0 end
- local pL=1+lockL.Position.Y.Offset/H
- local pI=1+lockIn.Position.Y.Offset/(H*.55)
- return math.clamp(math.min(pL,pI),0,1) end
+-- ---------- instances / main loop ----------
+TE.cur={}
+local lastPack,lastMode,lastKey
+local tacc,pacc=0,0
+local function activePack() for _,p in ipairs(TE.packs) do if X.tweakOn("lw_"..p.id) then return p end end end
 local function packBright(p)
  if p.bright~=nil then return p.bright end
  local r=p.cas[1] and p.cas[1].root
- p.bright=(r and r.bg and (.299*r.bg.R+.587*r.bg.G+.114*r.bg.B)>.8) and true or false
+ local B=r and r.base
+ p.bright=(B and B.bgA>.5 and (.299*B.bgR+.587*B.bgG+.114*B.bgB)>.8) and true or false
  return p.bright end
-local function makeSet(par,pack)
- local holder=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,ClipsDescendants=true,ZIndex=1},par)
- local set={holder=holder,insts={}} local zb=0
- for _,ca in ipairs(pack.cas) do
-  local inst=buildCA(holder,ca,zb)
-  -- scale from the layer's own size (falls back to the folder name) so every device size fills the screen
-  local rb=ca.root.base local dw,dh=pack.dw,pack.dh
-  if rb.w>0 and rb.h>0 then dw,dh=rb.w,rb.h end
-  inst.fit=math.max(W/dw,H/dh) zb=inst.z+1
-  set.insts[#set.insts+1]=inst end
- return set end
-
-local function rebuild()
- for _,c in pairs(cur) do if c.holder then c.holder:Destroy() end end cur={}
- local p=activePack() lastPack=p lastMode=nil lastSp=nil X.aodAnim=(p~=nil)
- if not p then return end
- cur.lock=makeSet(wallLock,p) cur.home=makeSet(wallHome,p)
- if X.aodHolder then cur.aod=makeSet(X.aodHolder,p) end
+TE.rebuild=function()
+ for _,c in pairs(TE.cur) do if c.holder then c.holder:Destroy() end end TE.cur={}
+ local p=activePack() lastPack=p lastKey=nil X.aodAnim=(p~=nil)
+ if p then
+  if not p.insts then
+   p.insts={}
+   for _,ca in ipairs(p.cas) do p.insts[#p.insts+1]=TE.build(p,ca,W,H) end
+   p.warmed=false end
+  local par={lock=wallLock,home=wallHome,aod=X.aodHolder}
+  for name,pr in pairs(par) do TE.cur[name]=TE.makeView(pr,p.insts) end
+ end
  if X.aodRefresh then pcall(X.aodRefresh) end end
 local oldApply=X.applyWalls
-X.applyWalls=function() cur={} oldApply() rebuild() end
+X.applyWalls=function() TE.cur={} oldApply() TE.rebuild() end
 conn(RunService.Heartbeat,function(dt)
  pacc=pacc+dt
- if pacc>=.25 then pacc=0 if activePack()~=lastPack then rebuild() end
+ if pacc>=.25 then pacc=0 if activePack()~=lastPack then TE.rebuild() end
   local lb=(lastPack~=nil) and (not S.dark) and packBright(lastPack) or false
   if lb~=(X.liveBright or false) then X.liveBright=lb pcall(X.applyTint) end end
  if not lastPack then return end
- dt=math.min(dt,.1)
- local mode=S.dark and "Dark" or "Light"
- -- progress follows the lock screen exactly while it moves; after the lock layer is cut
- -- (it becomes invisible mid-animation) the remainder plays out faster so the cut is not visible
- local target=progress()
- if lockL.Visible then
-  local d=target-sp local m=6*dt
-  if math.abs(d)<=m then sp=target else sp=sp+(d>0 and m or -m) end
- elseif sp>0 then sp=math.max(0,sp-3.5*dt) end
- local tg=S.off and 1 or 0
- wS=wS+(tg-wS)*math.min(1,dt*8) if math.abs(wS-tg)<.01 then wS=tg end
  tacc=tacc+dt
- local changed=(sp~=lastSp) or (wS~=lastWS) or (mode~=lastMode)
- if not changed and tacc<.033 then return end
- local step=tacc tacc=0 lastSp,lastWS,lastMode=sp,wS,mode
+ if tacc<.033 then return end
+ local step=math.min(tacc,.1) tacc=0
+ local mode=S.dark and "Dark" or "Light"
+ local key=S.off and "sleep" or ((S.screen=="lock") and "lock" or "home")
+ local act={lock=lockL.Visible,home=(not S.off) and (not S.app),aod=S.off}
+ if not (act.lock or act.home or act.aod) then return end
  local now=os.clock()
- for name,set in pairs(cur) do
-  local active=(name=="lock" and lockL.Visible) or (name=="home" and not S.off and not S.app) or (name=="aod" and S.off)
-  if active then
-   for _,inst in ipairs(set.insts) do
-    if name=="aod" then stepInst(inst,step,0,1,mode,now) else stepInst(inst,step,sp,wS,mode,now) end end end end end)
+ if not lastPack.warmed then lastPack.warmed=true for _,inst in ipairs(lastPack.insts) do TE.warm(inst,key,mode,now) end end
+ for _,inst in ipairs(lastPack.insts) do TE.step(inst,step,key,mode,now) end
+ for name,view in pairs(TE.cur) do if act[name] then TE.paintView(view) end end
+end)
 
 -- ===== EDIT LOCK SCREEN FROM THE HOME SCREEN =====
 X.lockEditHome=function()
