@@ -94,6 +94,7 @@ task.wait(.3)
 sg:Destroy() end
 
 local W,H=DEVICE.W,DEVICE.H
+local DOFF=H-844
 local CX,CY=W/2,H/2
 local EZ,ED=Enum.EasingStyle,Enum.EasingDirection
 local C3=Color3.fromRGB
@@ -107,7 +108,7 @@ local fam=CFG.FontFamily
 FACE[F_R]=Font.new(fam,Enum.FontWeight.Regular)
 FACE[F_M]=Font.new(fam,Enum.FontWeight.Medium)
 FACE[F_B]=Font.new(fam,Enum.FontWeight.Bold)
-FACEB[F_R]=Font.new(fam,Enum.FontWeight.Medium)
+FACEB[F_R]=Font.new(fam,Enum.FontWeight.Bold)
 FACEB[F_M]=Font.new(fam,Enum.FontWeight.Bold)
 FACEB[F_B]=Font.new(fam,Enum.FontWeight.Black)
 end)
@@ -354,6 +355,17 @@ local function snd(k,vv)
 if S.silent then return end
 if (k=="key" and S.opt.kbClick==false) or (k=="lock" and S.opt.lockSnd==false) or (k=="ntf" and S.focus) then return end
 local d=SND[k] if not d then return end
+if k=="key" then
+local pool=sounds.__kp
+if not pool then
+pool={} for i=1,10 do pool[i]=new("Sound",{SoundId=d[1],PlaybackSpeed=d[2]},SoundService) junk[#junk+1]=pool[i] end
+sounds.__kp=pool sounds.__ki=0 end
+sounds.__ki=sounds.__ki%#pool+1
+local ks=pool[sounds.__ki]
+ks.PlaybackSpeed=d[2]*(.97+math.random()*.07)
+ks.Volume=d[3]*math.clamp((vv or S.vol)*1.6,.1,1)
+pcall(function() ks.TimePosition=0 ks:Play() end)
+return end
 local s=sounds[k]
 if not s then s=new("Sound",{SoundId=d[1],PlaybackSpeed=d[2]},SoundService) sounds[k]=s junk[#junk+1]=s end
 s.Volume=d[3]*math.clamp((vv or S.vol)*1.6,.1,1) pcall(function() s:Play() end) end
@@ -371,8 +383,8 @@ local sbT={}
 local function reg(o,p) sbT[#sbT+1]={o,p} return o end
 local sbRec=fr(sb,30,13,66,26,RED,1,13)
 local sbTime=reg(tx(sb,"9:41",0,15,126,22,17,WHITE,F_B),"TextColor3")
-local sigG=new("Frame",{Position=UDim2.fromOffset(268,18),Size=UDim2.fromOffset(18,12),BackgroundTransparency=1},sb)
-for i=0,3 do local h=4+i*2.7 reg(fr(sigG,i*4.7,12-h,3.2,h,WHITE,0,1.2),"BackgroundColor3") end
+local sigG=new("Frame",{Position=UDim2.fromOffset(268,17),Size=UDim2.fromOffset(18,13),BackgroundTransparency=1},sb)
+for i=0,3 do local h=4+i*3 reg(fr(sigG,i*5,13-h,3,h,WHITE,0,1),"BackgroundColor3") end
 local wifiG=wifiGlyph(sb,293,18,1,WHITE,reg)
 local vpnL=reg(tx(sb,"VPN",226,16,36,22,11,WHITE,F_B,XR),"TextColor3")
 local batG=new("Frame",{Position=UDim2.fromOffset(316,18),Size=UDim2.fromOffset(28,13),BackgroundTransparency=1},sb)
@@ -1232,7 +1244,7 @@ local PGS={}
 local GL={
 air=function(f) ctr(f,15,15,3,22,WHITE,1.5,45) ctr(f,14,16,15,3,WHITE,1.5,45) end,
 wifi=function(f) wifiGlyph(f,6,9,.95,WHITE) end,
-bt=function(f) ctr(f,15,15,2,20,WHITE,1) ctr(f,18.5,9.5,2,9,WHITE,1,-45) ctr(f,18.5,20.5,2,9,WHITE,1,45) ctr(f,15,15,2,15,WHITE,1,45) end,
+bt=function(f) U.line(f,15,5,15,25,2.2,WHITE) U.line(f,9.5,11,21,19.5,2.2,WHITE) U.line(f,21,19.5,15,25,2.2,WHITE) U.line(f,9.5,19,21,10.5,2.2,WHITE) U.line(f,21,10.5,15,5,2.2,WHITE) end,
 cell=function(f) for i=0,3 do local h=4+i*3 ctr(f,7+i*5,22-h/2,3,h,WHITE,1) end end,
 hot=function(f) local o=ctr(f,15,15,16,16,WHITE,8) o.BackgroundTransparency=1 new("UIStroke",{Color=WHITE,Thickness=2},o) ctr(f,15,15,5,5,WHITE,2.5) end,
 batt=function(f) local o=ctr(f,14,15,18,10,WHITE,3) o.BackgroundTransparency=1 new("UIStroke",{Color=WHITE,Thickness=1.6},o) ctr(f,24.5,15,2,4,WHITE,1) ctr(f,11,15,8,6,WHITE,1.5) end,
@@ -4065,24 +4077,24 @@ X.buildDock() X.buildHome() X.rebuildWidgets() end
 X.refreshEdit=function() pcall(function() X.buildDock() X.buildHome() X.rebuildWidgets() end) end
 local dockF=new("CanvasGroup",{Size=UDim2.fromOffset(W,H),BackgroundTransparency=1},homeL)
 X.dockF=dockF
-X.dockFrost=frost(dockF,12,733,366,95,36,WHITE,.7)
+X.dockFrost=frost(dockF,12,733+DOFF,366,95,36,WHITE,.9)
 X.buildDock=function()
 for key,r in pairs(iconRefs) do
 if r[9] then r[1]:Destroy() if r[11] then r[11]:Destroy() end iconRefs[key]=nil end end
 for i,id in ipairs(DOCK) do
-local b=mkIcon(dockF,APP[id],60,cellX(i-1),750)
+local b=mkIcon(dockF,APP[id],60,cellX(i-1),750+DOFF)
 b.MouseButton1Click:Connect(function() if dragged then return end X.openApp(id,b) end)
-iconRefs[id]={b,0,cellX(i-1),750,60,nil,0,i-1,true}
+iconRefs[id]={b,0,cellX(i-1),750+DOFF,60,nil,0,i-1,true}
 if S.edit then iconRefs[id][11]=X.mkBadge(dockF,function() X.removeMenu(id) end) end end
 if X.layoutIcons then X.layoutIcons(true) end end
 X.buildDock()
 X.slotPos=function(col,row,dock)
-if dock and #DOCK>=6 then local n=#DOCK local pt=354/n local s0=math.min(60,pt-6) return 6+col*pt+(pt-s0)/2,750+(60-s0)/2,s0 end
-if dock and #DOCK>=5 then return 21+col*72,750,60 end
+if dock and #DOCK>=6 then local n=#DOCK local pt=354/n local s0=math.min(60,pt-6) return 6+col*pt+(pt-s0)/2,750+DOFF+(60-s0)/2,s0 end
+if dock and #DOCK>=5 then return 21+col*72,750+DOFF,60 end
 local big=X.opt("iconSize","Default")=="Large"
 local sz=big and (dock and 70 or 74) or 60
-if big then return 20+col*92+(dock and 2 or 0),dock and 747 or (66+row*97),sz end
-return cellX(col),dock and 750 or cellY(row),sz end
+if big then return 20+col*92+(dock and 2 or 0),dock and 747+DOFF or (66+row*97),sz end
+return cellX(col),dock and 750+DOFF or cellY(row),sz end
 X.layoutIcons=function(instant)
 local big=X.opt("iconSize","Default")=="Large"
 for id,r in pairs(iconRefs) do
@@ -4174,7 +4186,7 @@ if dock then px,py,sz=X.slotPos(i-1,0,true) else px,py,sz=X.slotPos((i-1)%4,sr+m
 local d=(x-px-sz/2)^2+(y-py-sz/2)^2
 if d<bd then bd=d best=i end end
 return best end
-if y>715 and type(item)=="string" then
+if y>715+DOFF and type(item)=="string" then
 if oDock then
 local it=table.remove(DOCK,oIdx)
 table.insert(DOCK,math.min(slotIdx(#DOCK+1,1,true),#DOCK+1),it)
@@ -4269,7 +4281,7 @@ if item.ids[1] then item.ids={} end end
 X.closeFolder() X.buildHome() end)
 ctr(mb,13,13,22,22,RED,11) ctr(mb,13,13,12,2.4,WHITE,1) end end end
 local dots={}
-for i=1,2 do dots[i]=fr(homeL,CX-10.5+(i-1)*14,708,7,7,WHITE,i==1 and 0 or .55,.5) end
+for i=1,2 do dots[i]=fr(homeL,CX-10.5+(i-1)*14,708+DOFF,7,7,WHITE,i==1 and 0 or .55,.5) end
 X.revealPrep=function()
 pages.Visible=false X.dockF.Visible=false
 for _,d in ipairs(dots) do d.Visible=false end end
@@ -4559,7 +4571,7 @@ local lib=new("ScrollingFrame",{Position=UDim2.fromOffset(0,108),Size=UDim2.from
 BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=0,CanvasSize=UDim2.fromOffset(0,860)},pg[3])
 local listF=new("Frame",{Position=UDim2.fromOffset(0,108),Size=UDim2.fromOffset(W,H-108-KBH),
 BackgroundTransparency=1,Visible=false},pg[3])
-local pill=fr(pg[3],16,56,W-32,40,C3(120,120,128),.55,20)
+local pill=fr(pg[3],16,56,W-32,40,WHITE,.9,20)
 local mg=new("Frame",{Position=UDim2.fromOffset(14,12),Size=UDim2.fromOffset(13,13),BackgroundTransparency=1},pill)
 cor(mg,.5) new("UIStroke",{Color=C3(200,200,206),Thickness=2},mg)
 ctr(pill,29,27,2.5,7,C3(200,200,206),1,-45)
@@ -4585,7 +4597,7 @@ local dup=false for _,v in ipairs(ids) do if v==id then dup=true end end
 if not dup and #ids<4 then ids[#ids+1]=id end end end
 ids=X.libFilter(ids)
 local x,y=20+((ci-1)%2)*185,6+math.floor((ci-1)/2)*190
-local g=fr(lib,x,y,165,165,C3(150,150,160),.62,30)
+local g=fr(lib,x,y,165,165,WHITE,.9,30)
 for k=1,3 do if ids[k] then slot(g,ids[k],12+((k-1)%2)*75,12+math.floor((k-1)/2)*75,66) end end
 if #ids==4 then slot(g,ids[4],87,87,66)
 else for k=0,3 do if ids[4+k] then slot(g,ids[4+k],87+(k%2)*34,87+math.floor(k/2)*34,31) end end end
@@ -5221,9 +5233,10 @@ local sg
 X.openSpot=function()
 if S.spot then return end
 S.spot=true spotL:ClearAllChildren() rg=nil
+local darkSpot=true
 sg=new("CanvasGroup",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromOffset(CX,CY),Size=UDim2.fromOffset(W,H),
 BackgroundTransparency=1,GroupTransparency=1},spotL)
-local dk=S.dark
+local dk=darkSpot
 local ink=dk and WHITE or C3(20,20,24)
 local ink2=dk and C3(235,235,242) or C3(70,70,78)
 fr(sg,0,0,W,H,dk and C3(6,6,10) or C3(240,240,246),dk and .4 or .25)
@@ -6114,7 +6127,7 @@ X.hiddenClose() X._ok=id X.openApp(id,nil) X._ok=nil end) end end
 X.libHidden=function(lib,ci)
 if not next(S.hidden) then lib.CanvasSize=UDim2.fromOffset(0,860) return end
 local x,y=20+((ci-1)%2)*185,6+math.floor((ci-1)/2)*190
-local g=fr(lib,x,y,165,165,C3(150,150,160),.62,30)
+local g=fr(lib,x,y,165,165,WHITE,.9,30)
 ctr(g,82,96,38,28,WHITE,6)
 local sk=ctr(g,82,70,22,26,WHITE,11) sk.BackgroundTransparency=1 new("UIStroke",{Color=WHITE,Thickness=3.5},sk)
 btn(g,0,0,165,165,function() X.faceID(function() X.hiddenSheet() end) end)
@@ -8199,7 +8212,7 @@ end
 end)()
 
 do
--- ===== ROTATE BUTTON (outside the phone, like the side buttons) + LANDSCAPE / STANDBY =====
+-- ===== LANDSCAPE / STANDBY =====
 local LW,LH=H,W
 local sbv=new("TextButton",{Size=UDim2.fromOffset(W,H),BackgroundColor3=BLACK,BorderSizePixel=0,Text="",
 AutoButtonColor=false,ZIndex=41,Visible=false},screen)
@@ -8234,7 +8247,7 @@ for i=1,3 do ctr(land,LW/2+(i-2)*18,LH-20,8,8,WHITE,4).BackgroundTransparency=(i
 sbv.MouseButton1Click:Connect(function() if S.off then X.power() return end X.sbStyle=X.sbStyle%3+1 sbBuild() snd("tap") end)
 X.sbBuild=sbBuild
 conn(RunService.Heartbeat,function()
-local show=X.land and not X.booting
+local show=X.land and not X.booting and X.opt("standby",true)
 if sbv.Visible~=show then sbv.Visible=show if show then sbBuild() end end
 if show and X.sbDim~=S.off then X.sbDim=S.off sbBuild() tw(land,.6,{GroupTransparency=S.off and .6 or 0}) end end)
 
@@ -8242,38 +8255,13 @@ X.setLand=function(on)
 on=on and true or false if on==(X.land or false) then return end
 X.land=on S.orient=on
 local a=gui.AbsoluteSize
-local lw,lh=W+22,H+104 if on then lw,lh=H+104,W+22 end
+local lw,lh=W+DEVICE.pl+DEVICE.pr,H+DEVICE.pt+DEVICE.pb+82 if on then lw,lh=H+DEVICE.pt+DEVICE.pb+82,W+DEVICE.pl+DEVICE.pr end
 local tgt=math.clamp(math.min((a.Y-16)/lh,(a.X-16)/lw),.15,2.2)
 local ti=TweenInfo.new(.6,Enum.EasingStyle.Quint,Enum.EasingDirection.InOut)
 TweenService:Create(dev,ti,{Rotation=on and 90 or 0}):Play()
 TweenService:Create(dscale,ti,{Scale=tgt}):Play()
 X.haptic() end
 
--- red round button above the phone; the icon is drawn piece by piece (phone + circular arrow), no emoji
-local rb=new("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromOffset(CX,-34),Size=UDim2.fromOffset(34,34),
-BackgroundColor3=C3(235,48,48),BorderSizePixel=0,ZIndex=60},dev) cor(rb,17)
-new("UIStroke",{Color=C3(120,20,20),Thickness=2},rb)
-local rs=new("UIScale",{},rb)
-local ph=new("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromOffset(17,17),Size=UDim2.fromOffset(9,15),
-BackgroundTransparency=1,BorderSizePixel=0,ZIndex=61},rb) cor(ph,2.5)
-new("UIStroke",{Color=WHITE,Thickness=1.6},ph)
-fr(ph,2.5,10.5,4,1.4,WHITE,0,1).ZIndex=61
-for i=0,8 do
-local ang=math.rad(-200+i*17)
-local d=new("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromOffset(17+math.cos(ang)*12.5,17+math.sin(ang)*12.5),
-Size=UDim2.fromOffset(2.6,2.6),BackgroundColor3=WHITE,BorderSizePixel=0,ZIndex=61},rb) cor(d,1.3) end
-local ea=math.rad(-200+8*17)
-local ex,ey=17+math.cos(ea)*12.5,17+math.sin(ea)*12.5
-local tang=math.deg(ea)+90
-for _,s in ipairs({-1,1}) do
-local w=new("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromOffset(ex,ey),Size=UDim2.fromOffset(2.4,6),
-BackgroundColor3=WHITE,BorderSizePixel=0,ZIndex=61,Rotation=tang+s*38},rb) cor(w,1) end
-local hit=new("TextButton",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromOffset(CX,-34),Size=UDim2.fromOffset(44,44),
-BackgroundTransparency=1,Text="",AutoButtonColor=false,ZIndex=62},dev)
-hit.MouseButton1Down:Connect(function() tw(rs,.12,{Scale=.88}) end)
-hit.MouseButton1Up:Connect(function() tw(rs,.3,{Scale=1},EZ.Back) end)
-hit.MouseLeave:Connect(function() tw(rs,.3,{Scale=1},EZ.Back) end)
-hit.MouseButton1Click:Connect(function() snd("tap") X.setLand(not X.land) end)
 end
 
 local tog=new("TextButton",{Position=UDim2.fromOffset(8,8),Size=UDim2.fromOffset(44,44),
@@ -9966,64 +9954,96 @@ Add.enc,Add.dec=enc,dec
 S.net=S.net or {online={},seen={},seq=0}
 S.dm=S.dm or {}
 local NET=S.net
+NET.online={} NET.seen={} NET.seq=NET.seq or 0
 local outQ={}
 local handlers={}
 Add.netOn=function(kind,fn) handlers[kind]=fn end
-local function sendRaw(text)
-local ok=false
-pcall(function()
-local TCS=game:GetService("TextChatService")
-local ch=TCS:FindFirstChild("TextChannels") and TCS.TextChannels:FindFirstChild("RBXGeneral")
-if ch then ch:SendAsync(text) ok=true end end)
-if ok then return end
-pcall(function()
-local ev=game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
-if ev and ev:FindFirstChild("SayMessageRequest") then ev.SayMessageRequest:FireServer(text,"All") end end) end
+-- Transport: a public pub/sub relay (ntfy) instead of the Roblox chat, so nothing is ever typed
+-- in game chat and nothing gets filtered into #### by Roblox. One topic per server (JobId).
+local reqf=request or http_request or (syn and syn.request) or (http and http.request)
+local HOSTS={{url="https://ntfy.sh",down=0},{url="https://ntfy.envs.net",down=0}}
+local function hreq(url,post)
+local ok,res=pcall(function()
+if reqf then
+local r=reqf({Url=url,Method=post and "POST" or "GET",Body=post,Headers={["User-Agent"]="Mozilla/5.0"}})
+if r and (r.StatusCode==nil or (r.StatusCode>=200 and r.StatusCode<300)) then return r.Body or "" end
+return nil end
+return game:HttpGet(url,true) end)
+if ok and type(res)=="string" then return res end
+return nil end
+local function topicName()
+local id=tostring(game.JobId)
+if id=="" then id="studio"..tostring(game.PlaceId) end
+local h=5381
+for i=1,#id do h=(h*33+id:byte(i))%4294967296 end
+return "ios18-"..string.format("%x",h)..string.format("%x",#id) end
+local TOPIC=topicName()
+Add.netState=function()
+if not (reqf or game.HttpGet) then return "nohttp" end
+local up=false for _,h in ipairs(HOSTS) do if h.down==0 then up=true end end
+return up and "ok" or "offline" end
 Add.netSend=function(kind,to,data)
 NET.seq=NET.seq+1
-outQ[#outQ+1]="i18|"..kind.."|"..tostring(to or 0).."|"..lp.UserId.."-"..NET.seq.."|"..enc(data or "") end
+outQ[#outQ+1]="i18|"..kind.."|"..lp.UserId.."|"..tostring(to or 0).."|"..lp.UserId.."-"..NET.seq.."-"..(os.time()%100000).."|"..enc(data or "") end
 task.spawn(function()
 while gui.Parent do
-task.wait(1.25)
-if #outQ>0 then sendRaw(table.remove(outQ,1)) end end end)
-local function onRaw(plr,text)
-if type(text)~="string" or text:sub(1,4)~="i18|" or not plr or plr==lp then return end
-local kind,to,id,data=text:match("^i18|(%a)|(%d+)|([%d%-]+)|(.*)$")
+task.wait(.5)
+if #outQ>0 then
+local msg=table.remove(outQ,1)
+for _,h in ipairs(HOSTS) do
+if h.down<os.clock() then
+local body=hreq(h.url.."/"..TOPIC,reqf and msg or nil)
+if not reqf then body=hreq(h.url.."/"..TOPIC.."/publish?message="..HttpS:UrlEncode(msg)) end
+if body==nil then h.fail=(h.fail or 0)+1 if h.fail>=3 then h.down=os.clock()+60 h.fail=0 end else h.fail=0 end end end end end end)
+local function process(text)
+if type(text)~="string" then return end
+local kind,from,to,id,data=text:match("^i18|(%a)|(%d+)|(%d+)|([%w%-]+)|(.*)$")
 if not kind then return end
-if NET.seen[id] then return end NET.seen[id]=true
-to=tonumber(to)
+from,to=tonumber(from),tonumber(to)
+if from==lp.UserId or NET.seen[id] then return end
+NET.seen[id]=true
 if to~=0 and to~=lp.UserId then return end
+local plr=Players:GetPlayerByUserId(from)
+if not plr then return end
 local h=handlers[kind]
 if h then safe("net."..kind,h,plr,dec(data),to==0) end end
-local hooked={}
-local function hookPlayer(p)
-if hooked[p] or p==lp then return end hooked[p]=true
-conn(p.Chatted,function(m) onRaw(p,m) end) end
-for _,p in ipairs(Players:GetPlayers()) do hookPlayer(p) end
-conn(Players.PlayerAdded,hookPlayer)
-safe("tcs",function()
-local TCS=game:GetService("TextChatService")
-conn(TCS.MessageReceived,function(m)
-local src=m.TextSource
-if src then onRaw(Players:GetPlayerByUserId(src.UserId),m.Text) end end)
-TCS.OnIncomingMessage=function(m)
-if type(m.Text)=="string" and m.Text:sub(1,4)=="i18|" then
-local pr=Instance.new("TextChatMessageProperties") pr.Text="" pr.PrefixText="" return pr end end end)
--- presence
+local since={}
+task.spawn(function()
+task.wait(2)
+local turn=0
+while gui.Parent do
+turn=turn%#HOSTS+1
+local h=HOSTS[turn]
+local inCall=Add.call and Add.call.state~="idle"
+local fast=inCall or (S.vis and not S.off)
+if h.down<os.clock() then
+local body=hreq(h.url.."/"..TOPIC.."/json?poll=1&since="..(since[h.url] or "90s"))
+if body==nil then h.fail=(h.fail or 0)+1 if h.fail>=3 then h.down=os.clock()+60 h.fail=0 end
+else
+h.fail=0
+for line in body:gmatch("[^\n]+") do
+local ok,j=pcall(function() return HttpS:JSONDecode(line) end)
+if ok and type(j)=="table" and j.event=="message" then
+since[h.url]=j.id or since[h.url]
+process(j.message) end end end end
+task.wait(inCall and 1.6 or (fast and 2.7 or 7)) end end)
+-- presence: announce on start, every 4 minutes, and answer new arrivals
 Add.online=function()
 local list={}
 for uid,o in pairs(NET.online) do
 local p=Players:GetPlayerByUserId(uid)
-if p and os.time()-o.t<150 then list[#list+1]={p=p,name=p.DisplayName,uid=uid} end end
+if p and os.time()-o.t<540 then list[#list+1]={p=p,name=p.DisplayName,uid=uid} end end
 table.sort(list,function(a,b) return a.name:lower()<b.name:lower() end)
 return list end
+local lastReply={}
 Add.netOn("h",function(p,data)
 local fresh=not NET.online[p.UserId]
 NET.online[p.UserId]={t=os.time(),name=p.DisplayName}
-if fresh then Add.netSend("h",p.UserId,"1") end end)
+if (fresh or data=="0") and os.time()-(lastReply[p.UserId] or 0)>60 then lastReply[p.UserId]=os.time() Add.netSend("h",p.UserId,"1") end end)
 task.spawn(function()
-task.wait(3) Add.netSend("h",0,"1")
-while gui.Parent do task.wait(50) Add.netSend("h",0,"1") end end)
+task.wait(2.5) Add.netSend("h",0,"0")
+while gui.Parent do task.wait(240) Add.netSend("h",0,"1") end end)
+conn(Players.PlayerAdded,function() task.delay(4,function() Add.netSend("h",0,"0") end) end)
 
 -- ---------------------------------------------------------------------
 -- MESSAGES (real)
@@ -10104,7 +10124,7 @@ for k,t in pairs(S.dm) do if not seen[k] then th2[#th2+1]={uid=t.uid,name=t.name
 table.sort(th2,function(a,b) local ta,tb=S.dm[tostring(a.uid)],S.dm[tostring(b.uid)] return (ta.msgs[#ta.msgs] and ta.msgs[#ta.msgs].ts or 0)>(tb.msgs[#tb.msgs] and tb.msgs[#tb.msgs].ts or 0) end)
 for _,t in ipairs(th2) do rows[#rows+1]=t end
 if #rows==0 then
-tx(lsf,"No one is using iOS 18 here yet",0,90,W,24,17,P.sub,F_M)
+tx(lsf,(Add.netState()=="nohttp") and "Needs an executor with HTTP support" or ((Add.netState()=="offline") and "Network relay unreachable, retrying..." or "No one is using iOS 18 here yet"),0,90,W,24,17,P.sub,F_M)
 tx(lsf,"Players running this script appear automatically",0,118,W,20,13,P.sub,F_R) end
 for i,r in ipairs(rows) do
 local row=tbtn(lsf,0,(i-1)*76,W,76,function() openChat(r.uid) end)
@@ -12152,7 +12172,7 @@ local g=fr(sf,16,y,W-32,168,P.card,0,14)
 local function sw(i,label,sub,key)
 local ry=(i-1)*56
 tx(g,label,16,ry+8,W-130,22,16,P.text,F_M,XL) tx(g,sub,16,ry+30,W-130,16,12,P.sub,F_R,XL)
-mkSwitch(g,W-32-67,ry+12,ACC[key],function(v) ACC[key]=v reapply() end)
+mkSwitch(g,W-32-67,ry+12,(key=="bold") and X.opt("bold",false) or ACC[key],function(v) if key=="bold" then S.opt.bold=v X.applyBold(v) else ACC[key]=v reapply() end end)
 if i<3 then fr(g,16,ry+55,W-64,1,P.sep) end end
 sw(1,"Bold Text","Thicker fonts everywhere","bold")
 sw(2,"Reduce Transparency","Solid backgrounds instead of glass","rt")
