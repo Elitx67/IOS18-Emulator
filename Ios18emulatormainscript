@@ -346,7 +346,9 @@ local ccIn=new("Frame",{Size=UDim2.fromOffset(W,H),BackgroundTransparency=1},ccL
 local siriL=layer(16,"CanvasGroup") siriL.Visible=false
 local kbL=layer(17) kbL.Visible=false
 local SND={key={"rbxassetid://139916999237555",1,.6},lock={"rbxassetid://87118548213919",1,.7},
-siri={"rbxassetid://123546935294021",1,.7}}
+siri={"rbxassetid://123546935294021",1,.7},
+ntf={"rbxassetid://73722479618078",1,.8},callend={"rbxassetid://7008043433",1,.8},shot={"rbxassetid://104304652801431",1,.8},alarm={"rbxassetid://4699563918",1,.9},charge={"rbxassetid://115724379828776",1,.8},
+msgsent={"rbxassetid://2610816226",1,.7},msgrecv={"rbxassetid://136404227786559",1,.8},pay={"rbxassetid://94258765009382",1,.9},ringout={"rbxassetid://1500107704",1,.8}}
 local sounds={}
 X.msnd=new("Sound",{Name="iOS_Music",SoundId="rbxassetid://"..CFG.MusicId,Volume=S.vol,Looped=false},SoundService)
 junk[#junk+1]=X.msnd
@@ -368,7 +370,9 @@ pcall(function() ks.TimePosition=0 ks:Play() end)
 return end
 local s=sounds[k]
 if not s then s=new("Sound",{SoundId=d[1],PlaybackSpeed=d[2]},SoundService) sounds[k]=s junk[#junk+1]=s end
+if k=="ringout" then s.Looped=true elseif k=="alarm" then s.Looped=true task.delay(8,function() pcall(function() s:Stop() end) end) end
 s.Volume=d[3]*math.clamp((vv or S.vol)*1.6,.1,1)*((k=="ntf" and (S.notifVol or 1)) or (k=="alarm" and (S.alarmVol or 1)) or 1) pcall(function() s:Play() end) end
+X.sndStop=function(k) local s=sounds[k] if s then pcall(function() s:Stop() end) end end
 local vh=fr(screen,14,CY-90,14,180,C3(30,30,34),.2,7) vh.ZIndex=25 vh.Visible=false
 local vf=fr(vh,0,0,14,0,WHITE,0,7)
 local vTok=0
@@ -599,7 +603,7 @@ local function loop(my,rate,fn) task.spawn(function() local t0=os.clock()
  while islTok==my do pcall(fn,os.clock()-t0) task.wait(rate or .1) end end) end
 local function tmLeft() if S.tm.run then return math.max(0,S.tm.endAt-os.clock()) end return S.tm.left or 0 end
 
-ACT.charging=function(d) local pc=d.pct or S.batt return {w=232,h=44,r=22,dur=2.6,build=function(p)
+ACT.charging=function(d) local pc=d.pct or S.batt snd("charge") return {w=232,h=44,r=22,dur=2.6,build=function(p)
  tx(p,"Charging",18,0,110,44,15,WHITE,F_M,XL) tx(p,pc.."%",118,0,52,44,15,GREEN,F_B,XR) batt(p,202,22,pc,GREEN) end} end
 ACT.lowbat=function(d) local pc=d.pct or S.batt return {w=252,h=44,r=22,dur=3.2,build=function(p)
  tx(p,"Low Battery",18,0,120,44,15,WHITE,F_M,XL) tx(p,pc.."%",132,0,52,44,15,RED,F_B,XR) batt(p,222,22,pc,RED) end} end
@@ -721,7 +725,9 @@ do local acc,lastMin=0,-1
 end
 local WALLS={{n="iOS 18",a="rbxassetid://96733119989895"},{n="iOS 16",a="rbxassetid://138166940487579"},
 {n="iOS 26",a="rbxassetid://76298955854765"},{n="iOS 27",a="rbxassetid://87096547132522"}}
-if not S.img then S.img=WALLS[S.wall].a end
+WALLS.def=1
+if DEVICE.id=="16pro" then WALLS[#WALLS+1]={n="iPhone 16",a="rbxassetid://96002194875908"} WALLS.def=#WALLS end
+if not S.img then S.wall=WALLS.def S.img=WALLS[S.wall].a end
 local function mkTaps(rings)
 local l={{0,0,1}}
 for _,r in ipairs(rings) do for i=0,r[1]-1 do
@@ -788,9 +794,9 @@ if ok and ex then local ok2,a=pcall(GA2,p) if ok2 and a then res=a break end end
 cache[id]=res return res or nil end end)()
 local ICON={}
 ICON.messages=function(f)
-sc(f,.5,.44,.74,.58,WHITE,.5,0,.36)
-sc(f,.28,.72,.18,.18,WHITE,0,45)
-sc(f,.28,.74,.12,.12,C3(10,203,44),0,45) end
+sc(f,.5,.46,.74,.56,WHITE,.5)
+sc(f,.29,.71,.15,.15,WHITE,0,38)
+sc(f,.235,.78,.1,.1,WHITE,.3,38) end
 ICON.calendar=function(f)
 local d=os.date("*t") sct(f,DSHORT[d.wday],.5,.2,.8,.18,RED,F_B)
 sct(f,tostring(d.day),.5,.6,.7,.5,C3(20,20,20),F_M) end
@@ -798,16 +804,17 @@ ICON.photos=function(f)
 local cols={C3(255,149,0),C3(255,204,0),C3(52,199,89),C3(0,199,190),C3(10,132,255),C3(94,92,230),C3(255,45,85),C3(255,59,48)}
 for i=0,7 do local a=math.rad(i*45) sc(f,.5+math.sin(a)*.17,.5-math.cos(a)*.17,.22,.4,cols[i+1],.5,i*45,.25) end end
 ICON.camera=function(f)
-sc(f,.5,.54,.78,.56,C3(38,38,42),.16,0,.1)
-sc(f,.35,.28,.26,.18,C3(38,38,42),.2,0,.06)
-sc(f,.5,.54,.42,.42,C3(32,32,36),.5)
-sc(f,.5,.54,.36,.36,C3(20,20,24),.5)
-sc(f,.5,.54,.28,.28,C3(200,210,240),.5)
-sc(f,.5,.54,.18,.18,C3(18,18,22),.5)
-sc(f,.5,.54,.08,.08,C3(80,120,220),.5)
-sc(f,.83,.28,.09,.09,C3(255,220,120),.5) end
+local dk,rg=C3(36,36,40),C3(190,190,196)
+sc(f,.5,.57,.8,.52,dk,.16)
+sc(f,.33,.3,.28,.13,dk,.35)
+sc(f,.5,.58,.46,.46,rg,.5)
+sc(f,.5,.58,.38,.38,dk,.5)
+sc(f,.8,.37,.075,.075,C3(255,206,0),.5) end
 ICON.mail=function(f)
-sc(f,.5,.52,.7,.5,WHITE,.12) sc(f,.37,.45,.44,.045,C3(10,120,240),.5,32) sc(f,.63,.45,.44,.045,C3(10,120,240),.5,-32) end
+local w=.05
+seg(f,.17,.3,.83,.3,w,WHITE) seg(f,.17,.7,.83,.7,w,WHITE)
+seg(f,.17,.3,.17,.7,w,WHITE) seg(f,.83,.3,.83,.7,w,WHITE)
+seg(f,.18,.32,.5,.54,w,WHITE) seg(f,.82,.32,.5,.54,w,WHITE) end
 ICON.clock=function(f)
 local face=sc(f,.5,.5,.9,.9,WHITE,.5) local upd=mkHands(face,BLACK,ORANGE,true)
 tickers[#tickers+1]={upd,f} pcall(upd) end
@@ -837,7 +844,8 @@ sc(f,.57,.27,.46,.095,WHITE,.35,-6)
 sc(f,.375,.5,.058,.46,WHITE,.5) sc(f,.775,.46,.058,.46,WHITE,.5)
 sc(f,.31,.72,.22,.16,WHITE,.5,-20) sc(f,.71,.68,.22,.16,WHITE,.5,-20) end
 ICON.appstore=function(f)
-sc(f,.43,.5,.09,.5,WHITE,.5,25) sc(f,.57,.5,.09,.5,WHITE,.5,-25) sc(f,.5,.56,.34,.07,WHITE,.5) end
+seg(f,.44,.21,.7,.77,.085,WHITE) seg(f,.56,.21,.3,.77,.085,WHITE)
+seg(f,.2,.62,.8,.62,.075,WHITE) end
 ICON.settings=function(f)
 local dk,lt=C3(44,44,48),C3(206,206,212)
 for i=0,39 do local a=math.rad(i*9) sc(f,.5+math.sin(a)*.418,.5-math.cos(a)*.418,.04,.09,dk,.3,i*9) end
@@ -846,7 +854,9 @@ for _,d in ipairs({95,215,335}) do local a=math.rad(d)
 seg(f,.5,.5,.5+math.sin(a)*.215,.5-math.cos(a)*.215,.075,lt) end
 sc(f,.5,.5,.1,.1,dk,.5) end
 ICON.phone=function(f)
-sc(f,.5,.5,.14,.62,WHITE,.5,-45) sc(f,.3,.3,.24,.24,WHITE,.5) sc(f,.7,.7,.24,.24,WHITE,.5) end
+for i=0,12 do local t=i/12 local u=1-t
+sc(f,u*u*.34+2*u*t*.3+t*t*.68,u*u*.33+2*u*t*.72+t*t*.7,.15,.15,WHITE,.5) end
+sc(f,.35,.31,.27,.16,WHITE,.4,-45) sc(f,.68,.68,.27,.16,WHITE,.4,-45) end
 ICON.passwords=function(f)
 sc(f,.36,.4,.36,.36,WHITE,.5) sc(f,.36,.4,.15,.15,C3(92,92,102),.5)
 sc(f,.62,.6,.46,.1,WHITE,.5,45) sc(f,.7,.7,.07,.16,WHITE,.3,45) end
@@ -1007,20 +1017,20 @@ if X.tweakExtra then pcall(X.tweakExtra) end end
 local APP={}
 local function def(id,name,c0,c1,draw,acc,fixed)
 APP[id]={id=id,name=name,c0=c0,c1=c1,draw=draw,acc=acc or c1,fixed=fixed} end
-def("messages","Messages",C3(103,247,127),C3(10,203,44),ICON.messages)
+def("messages","Messages",C3(122,232,112),C3(78,205,68),ICON.messages)
 def("calendar","Calendar",WHITE,C3(240,240,244),ICON.calendar,RED)
 def("photos","Photos",WHITE,C3(240,240,244),ICON.photos,ORANGE)
-def("camera","Camera",C3(185,185,192),C3(98,98,106),ICON.camera,C3(200,200,206))
-def("mail","Mail",C3(50,190,255),C3(10,110,240),ICON.mail)
+def("camera","Camera",C3(214,214,218),C3(152,152,158),ICON.camera,C3(200,200,206))
+def("mail","Mail",C3(84,176,252),C3(26,116,236),ICON.mail)
 def("clock","Clock",BLACK,BLACK,ICON.clock,ORANGE,true)
 def("weather","Weather",C3(80,160,255),C3(30,100,230),ICON.weather)
 def("notes","Notes",WHITE,C3(250,250,250),ICON.notes,YELLOW)
 def("calculator","Calculator",C3(208,208,210),C3(190,190,194),ICON.calculator,ORANGE)
 def("safari","Safari",WHITE,C3(236,236,241),ICON.safari,BLUE)
 def("music","Music",C3(252,96,118),C3(250,36,60),ICON.music)
-def("appstore","App Store",C3(32,200,251),C3(24,110,245),ICON.appstore)
+def("appstore","App Store",C3(66,184,252),C3(28,118,246),ICON.appstore)
 def("settings","Settings",C3(186,186,190),C3(128,124,136),ICON.settings,C3(190,192,200))
-def("phone","Phone",C3(103,247,127),C3(10,203,44),ICON.phone)
+def("phone","Phone",C3(122,232,112),C3(78,205,68),ICON.phone)
 def("wallet","Wallet",C3(46,46,50),C3(10,10,12),ICON.wallet,ORANGE,true)
 def("reminders","Reminders",WHITE,C3(244,244,247),ICON.reminders,ORANGE)
 def("files","Files",WHITE,C3(236,242,252),ICON.files,BLUE)
@@ -1679,7 +1689,7 @@ PGS.legal=info({{{t="Legal Notices"},{t="Warranty"},{t="Regulatory",val="FCC ID 
 PGS.reset=pg(function(h)
 local confirm=false
 local function doReset()
-S.opt={} S.vol=.6 X.setBright(1) S.dark=false S.blur=0 S.wall=1 S.img=WALLS[1].a S.icons=1 S.rm=false
+S.opt={} S.vol=.6 X.setBright(1) S.dark=false S.blur=0 S.wall=WALLS.def S.img=WALLS[WALLS.def].a S.icons=1 S.rm=false
 S.silent=false S.lp=false S.focus=false S.lock={font=1,color=1,widget=true,hue=2,shade=.5,weight=.8,glass=false,num=1}
 X.applyBold(false) X.theme() X.applyWarm() X.layoutIcons() X.applyLockStyle() X.refreshNotifs() X.refreshStatus() X.applyTint() X.restyle()
 X.island("All Settings Reset",2.2) end
@@ -2314,12 +2324,12 @@ local REPLIES={"Sounds good!","Haha nice","On my way","Okay!","Let me check and 
 local inp
 local function send()
 if not cur or inp.text=="" then return end
-local i=cur local m={me=true,t=inp.text} table.insert(S.chats[i].msgs,m) addMsg(m) inp.text="" inp.refresh() snd("ntf")
+local i=cur local m={me=true,t=inp.text} table.insert(S.chats[i].msgs,m) addMsg(m) inp.text="" inp.refresh() snd("msgsent")
 chatSub.Text="typing..."
 task.delay(1.4+math.random()*.8,function()
 if not S.app or S.app.id~="messages" then return end
 local rm={me=false,t=REPLIES[math.random(#REPLIES)]} table.insert(S.chats[i].msgs,rm)
-if cur==i then addMsg(rm) chatSub.Text="" snd("ntf") end end) end
+if cur==i then addMsg(rm) chatSub.Text="" snd("msgrecv") end end) end
 local bar
 inp,bar=U.bar(chat,P,"iMessage",{ret="send",submit=send,onKb=function(o)
 tw(msgs,.4,{Size=UDim2.fromOffset(W,o and H-212-250 or H-212)}) end})
@@ -2564,7 +2574,7 @@ task.delay(.28,function() fl:Destroy()
 local p={hue=math.random()*.8+.1,t=os.date("%H:%M"),face=front}
 S.photos[#S.photos+1]=p
 thumbF.BackgroundColor3=Color3.fromHSV(p.hue,.6,.7)
-X.island("Photo saved",1.4) snd("tap") end) end end)
+X.island("Photo saved",1.4) snd("shot") end) end end)
 local zoomV=tx(cont,"1.0×",CX-30,H-130,60,24,17,WHITE,F_B)
 addSlider(new("Frame",{Position=UDim2.fromOffset(CX-80,H-140),Size=UDim2.fromOffset(160,6),
 BackgroundColor3=C3(80,80,86),BorderSizePixel=0},cont),"x",function(v)
@@ -3811,7 +3821,7 @@ tx(c,cd.sub,24,56,W-80,22,15,cd.txt,F_R,XL)
 tx(c,cd.br,W-32-130,140,106,24,18,cd.txt,F_B,XR)
 for j=1,4 do fr(c,24+(j-1)*48,130,32,5,cd.txt,0,3) end
 cd.bal=cd.bal or math.random(100,9999)
-tbtn(c,0,0,W-32,h,function() if dragged then return end X.island(cd.n.."  -  Balance: $"..cd.bal,2.5) end)
+tbtn(c,0,0,W-32,h,function() if dragged then return end snd("pay") X.island(cd.n.."  -  Balance: $"..cd.bal,2.5) end)
 if cd.user then
 local rm=tx(c,"Remove",24,h-34,90,24,14,cd.txt,F_M,XL)
 tbtn(c,16,h-40,110,36,function() if dragged then return end table.remove(X.wCards,i) build() X.island("Card removed",1.6) end) end
@@ -4198,7 +4208,7 @@ BackgroundTransparency=1,Text=t,Font=F_M,TextSize=15,AutoButtonColor=false},tabR
 tabBtns2[i]=b2 b2.MouseButton1Click:Connect(function() if not dragged then selTab2(i) snd("tap") end end) end
 selTab2(1) end
 
-local pages=new("Frame",{Size=UDim2.fromOffset(W*3,H),BackgroundTransparency=1},homeL)
+local pages=new("CanvasGroup",{Size=UDim2.fromOffset(W*3,H),BackgroundTransparency=1},homeL) X.pagesG=pages
 local pg={}
 for i=1,3 do pg[i]=new("Frame",{Position=UDim2.fromOffset((i-1)*W,0),Size=UDim2.fromOffset(W,H),BackgroundTransparency=1},pages) end
 local widF=new("Frame",{Size=UDim2.fromOffset(W,260),BackgroundTransparency=1},pg[1])
@@ -5056,7 +5066,7 @@ local T=X.tweakOn("unlock26") and 1 or CFG.UnlockTime
 X.stopSp(lockIn) X.stopSp(lockL) X.stopSp(lockS)
 homeL.Visible=true
 if not X.tweakOn("unlock26") then
-homeS.Scale=1
+X.homeFx(0,0,0,0) homeS.Scale=1
 X.revealPrep()
 X.unlockPrep(T)
 tw(lkTime,.16,{TextTransparency=1}) tw(lkDate,.16,{TextTransparency=1})
@@ -5067,7 +5077,7 @@ X.applyTint()
 task.delay(.44,function() X.lockRestore() lockL.Visible=false end)
 task.delay(T,function() S.busy=false X.finishReveal() end)
 return end
-homeS.Scale=1
+X.homeFx(0,0,0,0) homeS.Scale=1
 X.revealPrep()
 tw(lkTime,.16,{TextTransparency=1}) tw(lkDate,.16,{TextTransparency=1})
 for _,n in ipairs(nots) do tw(n.g,.2,{GroupTransparency=1}) end
@@ -5721,7 +5731,7 @@ if ok and X.siriSpeak and type(text)=="string" then task.spawn(X.siriSpeak,text)
 ty:Destroy() cy=oldcy-48
 if kind=="big" then addCard(kind,data,text) elseif kind=="plain" then addCard(kind,nil,text)
 elseif kind=="ico" then addCard(kind,data,text) else addCard(kind,data,text) end
-snd("ntf") end) end
+end) end
 local demo={"What's the weather","Set a timer for 5 minutes","Play music","What's 12 times 8","Open Settings","Tell me a joke"}
 local dIdx=0
 conn(RunService.Heartbeat,function()
@@ -5796,7 +5806,7 @@ X.flashScreen=function()
 local f=fr(screen,0,0,W,H,WHITE,1) f.ZIndex=35
 tw(f,.08,{BackgroundTransparency=.1})
 task.delay(.1,function() tw(f,.4,{BackgroundTransparency=1})
-task.delay(.45,function() f:Destroy() end) end) snd("tap") end end
+task.delay(.45,function() f:Destroy() end) end) snd("shot") end end
 do
 local swc
 local function destroyApp(app) X.kbClose()
@@ -5812,6 +5822,28 @@ local function remember(id)
 for i,v in ipairs(S.recents) do if v==id then table.remove(S.recents,i) break end end
 table.insert(S.recents,1,id) while #S.recents>6 do table.remove(S.recents) end end
 local function rectOf(o) return (o.AbsolutePosition-dev.AbsolutePosition)/dscale.Scale,o.AbsoluteSize/dscale.Scale end
+do
+local FX={a=0,w=0,ta=0,tw=0,sa=0,sw=0,t0=0,da=.36,dw=1,Z=1.18,R=.9}
+local function apply()
+local hs=1-(1-FX.R)*FX.a
+homeS.Scale=hs
+X.whS.Scale=(1+(FX.Z-1)*FX.w)/hs
+local g=((X.perfLevel and X.perfLevel() or 1)<3) and .35*FX.a or 0
+if X.pagesG then X.pagesG.GroupTransparency=g end
+if X.dockF then X.dockF.GroupTransparency=g end end
+local function step()
+local t=os.clock()-FX.t0
+local ka,kw=math.clamp(t/FX.da,0,1),math.clamp(t/FX.dw,0,1)
+FX.a=FX.sa+(FX.ta-FX.sa)*(1-(1-ka)^4)
+FX.w=FX.sw+(FX.tw-FX.sw)*(1-(1-kw)^3)
+apply()
+if ka>=1 and kw>=1 and FX.con then FX.con:Disconnect() FX.con=nil end end
+X.homeFx=function(ta,tw2,da,dw)
+if FX.con then FX.con:Disconnect() FX.con=nil end
+FX.sa,FX.sw,FX.ta,FX.tw=FX.a,FX.w,ta,tw2 FX.da,FX.dw=da or .36,dw or 1 FX.t0=os.clock()
+if FX.da<=0 and FX.dw<=0 then FX.a,FX.w=ta,tw2 apply() return end
+FX.con=conn(RunService.Heartbeat,step) end
+end
 X.openApp=function(id,src)
 if S.busy or S.screen=="lock" or S.off or S.edit then return end
 local d=APP[id] if not d then return end
@@ -5819,7 +5851,7 @@ if S.ccOpen then X.closeCC() end
 if S.spot then X.closeSpot() end
 if S.screen=="switch" then X.closeSwitcher() end
 if S.app then destroyApp(S.app) S.app=nil end
-X.kbClose() snd("tap") S.busy=true
+X.kbClose() snd("tap") S.busy=true X.homeFx(1,1,CFG.AppOpen,1)
 local p,s
 if src and src.Parent then p,s=rectOf(src) else p,s=Vector2.new(CX-30,CY-30),Vector2.new(60,60) end
 local host=new("CanvasGroup",{Position=UDim2.fromOffset(p.X,p.Y),Size=UDim2.fromOffset(s.X,s.Y),
@@ -5839,10 +5871,11 @@ tw(cr,CFG.AppOpen,{CornerRadius=UDim.new(0,DEVICE.rad)},EZ.Exponential) tw(cs,CF
 tw(host,.16,{GroupTransparency=0})
 local ips=src and src.Parent and src:FindFirstChild("ps")
 if ips then tw(ips,.25,{Scale=.86}) end
-task.delay(CFG.AppOpen+.03,function() S.busy=false if S.app==app then homeL.Visible=false end end) end
+task.delay(CFG.AppOpen+.03,function() S.busy=false end)
+task.delay(1.05,function() if S.app==app then homeL.Visible=false end end) end
 X.closeApp=function()
 local app=S.app if not app or S.busy then return end
-S.busy=true S.app=nil S.screen="home" remember(app.id) homeL.Visible=true
+S.busy=true S.app=nil S.screen="home" remember(app.id) homeL.Visible=true X.homeFx(0,0,.36,1)
 local ref=iconRefs[app.id]
 local x0,y0,sz=CX-30,CY-30,60
 if ref and ((ref[2]==0 and S.page~=3) or ref[2]==S.page or (ref[2]==-2 and X.folderOpen)) then
@@ -5858,11 +5891,11 @@ task.delay(.4,function() destroyApp(app) S.busy=false end) end
 X.closeAppNow=function()
 local app=S.app
 if app then remember(app.id) destroyApp(app) S.app=nil end
-homeS.Scale=1 homeL.Visible=true end
+X.homeFx(0,0,0,0) homeL.Visible=true end
 X.suspend=function()
 local a=S.app if not a then return end
 S.app=nil S.busy=true remember(a.id)
-homeS.Scale=1 homeL.Visible=true
+X.homeFx(0,0,.4,.8) homeL.Visible=true
 tw(a.host,.4,{Position=UDim2.fromOffset(CX-122,128),Size=UDim2.fromOffset(244,528)},EZ.Quint)
 tw(a.cr,.4,{CornerRadius=UDim.new(0,38)}) tw(a.cs,.4,{Scale=244/W})
 X.openSwitcher()
@@ -6158,7 +6191,7 @@ conn(RunService.Heartbeat,function()
 local t=os.time() if t-lastSec<((X.perfLevel and X.perfLevel()==3) and 2 or 1) then return end
 lastSec=t
 if S.tm.run and os.clock()>=S.tm.endAt then
-S.tm.run=false S.tm.left=S.tm.dur snd("ntf")
+S.tm.run=false S.tm.left=S.tm.dur snd("alarm")
 X.island("Timer finished",4,function(g)
 ctr(g,16,16,26,26,ORANGE,13) ctr(g,16,14,2.5,9,WHITE,1) end) end
 for i=#tickers,1,-1 do local k=tickers[i]
@@ -6167,7 +6200,7 @@ local d=os.date("*t")
 for _,a in ipairs(S.alarms) do
 local key=d.hour*60+d.min
 if a.on and a.h==d.hour and a.m==d.min and a.fired~=key then
-a.fired=key snd("ntf")
+a.fired=key snd("alarm")
 X.island(a.label.."  "..X.clockStr(d),5,function(g)
 ctr(g,16,16,26,26,ORANGE,13) ctr(g,16,14,2.5,9,WHITE,1) end) end end
 if X.tweakOn("wallcycle") and t%20==0 then S.wall=S.wall%#WALLS+1 S.img=WALLS[S.wall].a X.applyWalls() end
@@ -6850,7 +6883,7 @@ if not notifActive then X._showNextNotif() end end
 X._showNextNotif=function()
 if #notifQ==0 then notifActive=false return end
 notifActive=true
-local n=table.remove(notifQ,1)
+local n=table.remove(notifQ,1) snd("ntf")
 local d=APP[n.id] or {name="Notification",c0=C3(60,60,66),c1=C3(40,40,48)}
 -- card frame (starts above screen)
 local card=new("CanvasGroup",{AnchorPoint=Vector2.new(.5,0),
@@ -10250,7 +10283,7 @@ local th0=thread(p.UserId,p.DisplayName)
 table.insert(th0.msgs,{me=false,t=text,ts=os.time()})
 if #th0.msgs>200 then table.remove(th0.msgs,1) end
 local viewing=S.app and S.app.id=="messages" and Add.chatOpen==p.UserId
-if not viewing then th0.unread=(th0.unread or 0)+1 X.pushNotif("messages",p.DisplayName,text) end
+if viewing then snd("msgrecv") else th0.unread=(th0.unread or 0)+1 X.pushNotif("messages",p.DisplayName,text) end
 for _,f in ipairs(msgListeners) do pcall(f,p.UserId) end end)
 local function sendMessage(uid,text)
 local th0=thread(uid)
@@ -10285,7 +10318,7 @@ local inp,bar
 local function send()
 if not cur or inp.text=="" then return end
 local t=inp.text inp.text="" inp.refresh()
-sendMessage(cur,t) addMsg(S.dm[tostring(cur)].msgs[#S.dm[tostring(cur)].msgs]) snd("ntf")
+sendMessage(cur,t) addMsg(S.dm[tostring(cur)].msgs[#S.dm[tostring(cur)].msgs]) snd("msgsent")
 if not NET.online[cur] then chatSub.Text="Delivered to chat (no reply yet)" end end
 inp,bar=U.bar(chat,P,"iMessage",{ret="send",submit=send,onKb=function(o)
 tw(msgs,.4,{Size=UDim2.fromOffset(W,o and H-212-250 or H-212)}) end})
@@ -10351,7 +10384,7 @@ local function endCall(msg,silent)
 if CALL.state=="idle" then return end
 local peer=CALL.peer
 if not silent then Add.netSend("c",peer,"end") end
-CALL.state="idle" CALL.token=(CALL.token or 0)+1
+CALL.state="idle" CALL.token=(CALL.token or 0)+1 X.sndStop("ringout") snd("callend")
 if callUI then local c=callUI callUI=nil tw(c,.35,{GroupTransparency=1}) task.delay(.4,function() c:Destroy() end) end
 if CALL.muted then setMic(false) CALL.muted=false end
 if msg then X.island(msg,2.2) end
@@ -10412,7 +10445,7 @@ if CALL.state~="idle" then X.island("Already in a call",1.8) return end
 local p=Players:GetPlayerByUserId(uid)
 if not p then X.island("Player not in this server",2) return end
 CALL.state="ringing_out" CALL.peer=uid CALL.name=p.DisplayName CALL.token=(CALL.token or 0)+1
-Add.netSend("c",uid,"ring") showCall() snd("ntf",S.ringVol or .7)
+Add.netSend("c",uid,"ring") showCall() snd("ringout",S.ringVol or .7)
 local tok=CALL.token
 task.delay(35,function() if CALL.token==tok and CALL.state=="ringing_out" then endCall("No answer") end end) end
 Add.netOn("c",function(p,data)
@@ -10426,7 +10459,7 @@ task.spawn(function() while CALL.token==tok and CALL.state=="ringing_in" do snd(
 task.delay(35,function() if CALL.token==tok and CALL.state=="ringing_in" then endCall("Missed call",true) X.pushNotif("phone","Missed call",p.DisplayName) end end)
 elseif CALL.peer==p.UserId then
 if data=="acc" and CALL.state=="ringing_out" then
-CALL.state="active" CALL.t0=os.clock() if callUI then showCall() end
+CALL.state="active" X.sndStop("ringout") CALL.t0=os.clock() if callUI then showCall() end
 elseif data=="dec" then endCall("Call declined",true)
 elseif data=="busy" then endCall("Line busy",true)
 elseif data=="end" then endCall("Call ended",true) end end end)
@@ -11713,7 +11746,7 @@ local busy=false
 local function flashFx()
 if cs.flash then flashO.BackgroundTransparency=0 tw(flashO,.45,{BackgroundTransparency=1})
 else flashO.BackgroundTransparency=.6 tw(flashO,.2,{BackgroundTransparency=1}) end
-snd("tap") end
+snd("shot") end
 local function finishShot(id,mode,n) Add.addPhoto(mode,id,{n=n}) setThumb() end
 local function shoot()
 if busy then return end busy=true
@@ -13258,7 +13291,7 @@ local t=inp.text inp.text="" inp.refresh()
 local th0=th2(cur)
 local m={me=true,t=t,ts=os.time()} table.insert(th0.msgs,m)
 for i=1,#t,120 do Add.netSend(kind,cur,t:sub(i,i+119)) end
-addMsg(m) snd("ntf") end
+addMsg(m) snd("msgsent") end
 inp,bar=U.bar(chat,P,snapMode and "Send a Snap" or "Message",{ret="send",submit=send,onKb=function(o) tw(msgs,.4,{Size=UDim2.fromOffset(W,o and H-208-250 or H-208)}) end})
 local sb=fr(bar,W-48,5,32,32,col,0,.5) tx(sb,">",0,0,32,32,18,WHITE,F_B) tbtn(sb,0,0,32,32,send)
 local function openChat(uid)
@@ -14327,7 +14360,7 @@ S.wrows={{"calendar","clock"}} S.wsz={} S.ccOrder={} S.hidden={} S.touchReq={} S
 S.dockSave=nil
 for i=#DOCK,1,-1 do table.remove(DOCK,i) end for _,id in ipairs({"phone","safari","messages","music"}) do DOCK[#DOCK+1]=id end end
 if kind=="settings" or kind=="all" then
-S.opt={} S.dark=false S.hue=nil S.icons=1 S.wall=1 S.img=WALLS[1].a S.bright=1 S.vol=.6
+S.opt={} S.dark=false S.hue=nil S.icons=1 S.wall=WALLS.def S.img=WALLS[WALLS.def].a S.bright=1 S.vol=.6
 S.lock={font=1,color=1,widget=true,hue=2,shade=.5,weight=.8,glass=false,num=1,b1="flash",b2="camera",wk="battery"}
 S.perf={mode="auto",auto=1,te="auto",cap="auto"} end
 if kind=="all" then
@@ -14667,7 +14700,7 @@ local r=fr(sf,16,y,W-32,52,P.card,0,14)
 tx(r,L.name,16,0,W-190,52,16,P.text,F_M,XL).TextTruncate=Enum.TextTruncate.AtEnd
 pill(r,W-32-168,10,76,32,"Apply",BLUE,WHITE,function()
 for _,k in ipairs(KEYS) do S.lock[k]=L.v[k] end
-if L.wall and not CFG.WallpaperId then S.wall=L.wall S.img=WALLS[S.wall].a pcall(X.applyWalls) end
+if L.wall and WALLS[L.wall] and not CFG.WallpaperId then S.wall=L.wall S.img=WALLS[S.wall].a pcall(X.applyWalls) end
 loadedSrc=nil pcall(X.applyLockStyle) pcall(Add.paintLockBtns) X.island("Look applied",1.6) end,13)
 pill(r,W-32-84,10,72,32,"Delete",C3(70,70,78),WHITE,function() table.remove(S.lockLooks,i) X.island("Look deleted",1.4) end,13)
 y=y+60 end
