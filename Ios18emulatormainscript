@@ -368,12 +368,12 @@ pcall(function() ks.TimePosition=0 ks:Play() end)
 return end
 local s=sounds[k]
 if not s then s=new("Sound",{SoundId=d[1],PlaybackSpeed=d[2]},SoundService) sounds[k]=s junk[#junk+1]=s end
-s.Volume=d[3]*math.clamp((vv or S.vol)*1.6,.1,1) pcall(function() s:Play() end) end
+s.Volume=d[3]*math.clamp((vv or S.vol)*1.6,.1,1)*((k=="ntf" and (S.notifVol or 1)) or (k=="alarm" and (S.alarmVol or 1)) or 1) pcall(function() s:Play() end) end
 local vh=fr(screen,14,CY-90,14,180,C3(30,30,34),.2,7) vh.ZIndex=25 vh.Visible=false
 local vf=fr(vh,0,0,14,0,WHITE,0,7)
 local vTok=0
 local function setVol(v)
-S.vol=math.clamp(v,0,1) vf.Size=UDim2.fromOffset(14,180*S.vol) vf.Position=UDim2.fromOffset(0,180*(1-S.vol))
+S.vol=math.clamp(v,0,1) if X.volHud then X.volHud() snd("tap") return end vf.Size=UDim2.fromOffset(14,180*S.vol) vf.Position=UDim2.fromOffset(0,180*(1-S.vol))
 vh.Visible=true vTok=vTok+1 local my=vTok snd("tap")
 task.delay(1.4,function() if vTok==my then vh.Visible=false end end) end
 local dimmer,offF
@@ -457,7 +457,8 @@ for i=k+1,3 do aodN[i].Visible=false end
 if stb then aodT.TextSize=150 aodT.Position=UDim2.fromOffset(0,H/2-95) aodT.TextColor3=C3(255,72,48)
 aodT.TextTransparency=.1 aodD.Position=UDim2.fromOffset(0,H/2-135) aodD.TextColor3=C3(255,72,48)
 else aodT.TextSize=92 aodT.Position=UDim2.fromOffset(0,114) aodT.TextColor3=WHITE
-aodT.TextTransparency=.5 aodD.Position=UDim2.fromOffset(0,90) aodD.TextColor3=WHITE end end
+aodT.TextTransparency=.5 aodD.Position=UDim2.fromOffset(0,90) aodD.TextColor3=WHITE end
+ if X.aodStyle then X.aodStyle(aodT,aodD,stb) end end
 X.haptic=function()
 if S.opt.haptics==false then return end
 dev.Position=UDim2.new(.5,1.5,.5,0) tw(dev,.28,{Position=UDim2.fromScale(.5,.5)},EZ.Back) end
@@ -822,10 +823,15 @@ sc(f,.5,.315,.38,.16,C3(92,92,97),.14)
 for row=0,2 do for col=0,2 do
 sc(f,.34+col*.16,.5+row*.13,.1,.1,(col==2) and ORANGE or C3(160,160,166),.5) end end end
 ICON.safari=function(f)
-sc(f,.5,.5,.84,.84,C3(0,122,255),.5) sc(f,.5,.5,.72,.72,C3(238,246,255),.5)
-for i=0,11 do local a=math.rad(i*30)
-sc(f,.5+math.sin(a)*.32,.5-math.cos(a)*.32,.016,(i%3==0) and .06 or .035,C3(120,130,150),.5,i*30) end
-sc(f,.627,.373,.1,.36,RED,.5,45) sc(f,.373,.627,.1,.36,C3(150,155,168),.5,45) sc(f,.5,.5,.08,.08,WHITE,.5) end
+local o=sc(f,.5,.5,.86,.86,C3(0,122,255),.5)
+new("UIGradient",{Color=ColorSequence.new(C3(112,205,255),C3(0,108,238)),Rotation=48},o)
+for i=0,59 do local a=math.rad(i*6)
+local big=(i%5==0)
+local len=big and .05 or .024
+local r=.382-len/2
+sc(f,.5+math.sin(a)*r,.5-math.cos(a)*r,big and .014 or .009,len,WHITE,.5,i*6) end
+sc(f,.585,.415,.062,.31,RED,.5,45) sc(f,.415,.585,.062,.31,C3(244,247,252),.5,45)
+sc(f,.5,.5,.05,.05,C3(232,236,244),.5) end
 ICON.music=function(f)
 sc(f,.57,.27,.46,.095,WHITE,.35,-6)
 sc(f,.375,.5,.058,.46,WHITE,.5) sc(f,.775,.46,.058,.46,WHITE,.5)
@@ -4867,6 +4873,8 @@ return (str:gsub("%d",function(d) return utf8.char(b+tonumber(d)) end)) end
 local CCOL={WHITE,C3(255,218,73),C3(109,204,255),C3(255,140,175),C3(140,235,160),C3(255,165,80)}
 local lkDate=tx(lockIn,"",0,90,W,28,21,WHITE,F_M)
 local lkTime=tx(lockIn,"",0,114,W,110,92,WHITE,F_B) lkTime.TextTransparency=.08
+X.lkTime=lkTime X.lkDate=lkDate
+X.fgHolder=new("Frame",{Name="fgHolder",Size=UDim2.fromScale(1,1),BackgroundTransparency=1,ZIndex=2,Active=false},lockIn)
 ctr(lockIn,CX,70,14,11,WHITE,2.5)
 local shk=new("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromOffset(CX,60),
 Size=UDim2.fromOffset(9,11),BackgroundTransparency=1},lockIn) cor(shk,4.5)
@@ -7571,7 +7579,7 @@ TE.parseCA=function(dir)
     for _,ch in ipairs(m.k) do T.by[e.a.targetId][ch]=sp or {off=true} end
    end end end end
   trans[#trans+1]=T end end end
- return {root=root,reg=reg,states=states,trans=trans,res={}} end
+ return {root=root,reg=reg,states=states,trans=trans,res={},wave=(s:find("meshTransform",1,true) and s:find("CABackdropLayer",1,true)) and true or nil} end
 
 -- merged copy of a state following basedOn
 TE.flatten=function(states,S_,depth)
@@ -8148,8 +8156,15 @@ TE.rebuild=function()
    p.insts={}
    for _,ca in ipairs(p.cas) do p.insts[#p.insts+1]=TE.build(p,ca,W,H) end
    p.warmed=false end
+  local bg,fg={},{}
+  X.teWave=false
+  for _,inst in ipairs(p.insts) do
+   local nm=tostring(inst.ca and inst.ca.root and inst.ca.root.name or ""):upper()
+   if nm=="_FLOATING" or nm=="_FOREGROUND" then fg[#fg+1]=inst else bg[#bg+1]=inst end
+   if inst.ca and inst.ca.wave then X.teWave=true end end
   local par={lock=wallLock,home=wallHome,aod=X.aodHolder}
-  for name,pr in pairs(par) do TE.cur[name]=TE.makeView(pr,p.insts) end
+  for name,pr in pairs(par) do TE.cur[name]=TE.makeView(pr,bg) end
+  if #fg>0 and X.fgHolder then TE.cur.lockfg=TE.makeView(X.fgHolder,fg) end
  end
  if X.aodRefresh then pcall(X.aodRefresh) end end
 local oldApply=X.applyWalls
@@ -8165,7 +8180,7 @@ conn(RunService.Heartbeat,function(dt)
  local step=math.min(tacc,.1) tacc=0
  local mode=S.dark and "Dark" or "Light"
  local key=S.off and "sleep" or ((S.screen=="lock") and "lock" or "home")
- local act={lock=lockL.Visible,home=(not S.off) and (not S.app),aod=S.off}
+ local act={lock=lockL.Visible,lockfg=lockL.Visible,home=(not S.off) and (not S.app),aod=S.off}
  if not (act.lock or act.home or act.aod) then return end
  local now=os.clock()+(X.teBias or 0)
  local dg=X.teDrag if dg and dg.p then key=dg.to now=dg.v0+dg.p*dg.dur end
@@ -8513,9 +8528,9 @@ S.calcHist=S.calcHist or {}
 local SAVE_DIR="iOS18"
 local SAVE_FILE="iOS18/save_v7.json"
 local function fileOK() return type(writefile)=="function" and type(readfile)=="function" and type(isfile)=="function" end
-local DATA_KEYS={"notes","rems","alarms","contacts","events","chats","memos","journal","habits","hs","health","focusStats","calcHist","modes","st","nlog","locs","dm","shortcuts","sf","photos","books","pod","au","acc","spotRecent","cam","dockSave","lock","conv","sp","ig","tt","ttFeed","nf","mc","chatx","yt","perf","ncfg","home","wrows","wsz","ccOrder","hidden","touchReq","deleted","ccFav","privLog"}
+local DATA_KEYS={"notes","rems","alarms","contacts","events","chats","memos","journal","habits","hs","health","focusStats","calcHist","modes","st","nlog","locs","dm","shortcuts","sf","photos","books","pod","au","acc","spotRecent","cam","dockSave","lock","conv","sp","ig","tt","ttFeed","nf","mc","chatx","yt","perf","ncfg","home","wrows","wsz","ccOrder","hidden","touchReq","deleted","ccFav","privLog","lockLooks","briefDay","weekDay"}
 Add.DATA_KEYS=DATA_KEYS
-local SCALAR_KEYS={"dark","hue","icons","wall","vol","bright","silent"}
+local SCALAR_KEYS={"dark","hue","icons","wall","vol","bright","silent","ringVol","alarmVol","notifVol","volSide"}
 Add.jsonSafe=nil
 local function jsonSafe(v,depth)
 depth=depth or 0
@@ -10397,7 +10412,7 @@ if CALL.state~="idle" then X.island("Already in a call",1.8) return end
 local p=Players:GetPlayerByUserId(uid)
 if not p then X.island("Player not in this server",2) return end
 CALL.state="ringing_out" CALL.peer=uid CALL.name=p.DisplayName CALL.token=(CALL.token or 0)+1
-Add.netSend("c",uid,"ring") showCall() snd("ntf")
+Add.netSend("c",uid,"ring") showCall() snd("ntf",S.ringVol or .7)
 local tok=CALL.token
 task.delay(35,function() if CALL.token==tok and CALL.state=="ringing_out" then endCall("No answer") end end) end
 Add.netOn("c",function(p,data)
@@ -10405,9 +10420,9 @@ if data=="ring" then
 if CALL.state~="idle" then Add.netSend("c",p.UserId,"busy") return end
 if S.focus and not (Add.modeAllows and Add.modeAllows("phone")) then Add.netSend("c",p.UserId,"busy") X.pushNotif("phone","Missed call",p.DisplayName) return end
 CALL.state="ringing_in" CALL.peer=p.UserId CALL.name=p.DisplayName CALL.token=(CALL.token or 0)+1
-showCall() snd("ntf")
+showCall() snd("ntf",S.ringVol or .7)
 local tok=CALL.token
-task.spawn(function() while CALL.token==tok and CALL.state=="ringing_in" do snd("ntf") task.wait(2.2) end end)
+task.spawn(function() while CALL.token==tok and CALL.state=="ringing_in" do snd("ntf",S.ringVol or .7) task.wait(2.2) end end)
 task.delay(35,function() if CALL.token==tok and CALL.state=="ringing_in" then endCall("Missed call",true) X.pushNotif("phone","Missed call",p.DisplayName) end end)
 elseif CALL.peer==p.UserId then
 if data=="acc" and CALL.state=="ringing_out" then
@@ -13961,7 +13976,8 @@ local CTRL={
 {id="rec",n="Record",col=RED,get=function() return S.rec end,set=function(v) S.rec=v if v then X.recT0=os.clock() end st() end},
 {id="camera",n="Camera",col=C3(120,120,128),act="camera"},{id="calc",n="Calculator",col=C3(255,149,0),act="calculator"},
 {id="timer",n="Timer",col=C3(255,149,0),act="clock"},{id="notes",n="Notes",col=C3(255,204,0),act="notes"},
-{id="voice",n="Voice Memo",col=RED,act="voice"},{id="shortcuts",n="Shortcuts",col=PURPLE,act="shortcuts"},{id="server",n="Server",col=BLUE,act="server"}}
+{id="voice",n="Voice Memo",col=RED,act="voice"},{id="shortcuts",n="Shortcuts",col=PURPLE,act="shortcuts"},{id="server",n="Server",col=BLUE,act="server"},
+{id="gori",n="Game Rotation",col=GREEN,get=function() return (S.opt.gameOri or "auto")~="landscape" end,lbl=function() return ({landscape="Landscape",auto="Auto",portrait="Portrait"})[S.opt.gameOri or "auto"] end,set=function() Add.cycleGameOri() end}}
 local CBY={} for _,c in ipairs(CTRL) do CBY[c.id]=c end
 local PG={"Controls","Favorites","Music","Connectivity","Focus"}
 local function ccBg(par)
@@ -13972,7 +13988,7 @@ local f=fr(par,x,y,w,w,on and c.col or C3(70,70,76),on and 0 or .25,22)
 new("UIStroke",{Color=WHITE,Transparency=.85,Thickness=1},f)
 tx(f,c.n,4,w-34,w-8,28,12,WHITE,F_M)
 local ic=ctr(f,w/2,w/2-8,26,26,WHITE,13) ic.BackgroundTransparency=on and .15 or .75
-tx(f,c.get and (on and "On" or "Off") or "Open",0,w/2-20,w,24,11,on and BLACK or WHITE,F_B)
+tx(f,c.lbl and c.lbl() or (c.get and (on and "On" or "Off") or "Open"),0,w/2-20,w,24,11,on and BLACK or WHITE,F_B)
 local hold=0
 local b=tbtn(f,0,0,w,w,function()
 if edit then return end
@@ -14380,6 +14396,7 @@ local init=1 for i,v in ipairs(vals) do if v==cur then init=i end end
 segCtl(sf,P,16,y,W-32,labels,init,function(i) cb(vals[i]) end) y=y+46 end
 seg("Performance mode",{"Auto","High","Balanced","Low"},{"auto",1,2,3},S.perf.mode,function(v) S.perf.mode=v if v=="auto" then S.perf.auto=1 end X.island("Performance updated",1.4) end)
 seg("Frame rate cap",{"Auto","30","60","90","120","Max"},{"auto",30,60,90,120,"max"},S.perf.cap,function(v) S.perf.cap=v if v=="auto" then if setfpscap then pcall(setfpscap,0) end else Add.applyCap() end X.island(setfpscap and "Frame rate cap set" or "This executor cannot change the cap",2) end)
+seg("Game screen rotation",{"Landscape","Auto","Portrait"},{"landscape","auto","portrait"},S.opt.gameOri or "auto",function(v) Add.setGameOri(v) end)
 seg("Live wallpaper (Tendies) rate",{"Auto","30","60","90","120"},{"auto",30,60,90,120},S.perf.te,function(v) S.perf.te=v end)
 local m=tx(sf,"Auto follows your display: it renders every frame your device can draw, whether that is 30, 60, 90, 120 or more.",24,y,W-48,44,12,P.sub,F_R,XL) m.TextWrapped=true m.TextYAlignment=Enum.TextYAlignment.Top
 y=y+54
@@ -14411,6 +14428,563 @@ if not folder then folder={folder=true,name="Tools Plus",ids={}} table.insert(S.
 table.insert(folder.ids,id) end end end
 safe("norm",X.normalize) safe("home",X.buildHome) safe("dock",X.buildDock)
 Add.nlDirty=true
+end)()
+
+-- =====================================================================
+-- v12: CLOCK EFFECTS, DEPTH IMAGE, AOD FONT, WALLPAPER CYCLE
+-- =====================================================================
+;(function()
+local Add=X.add
+local registerApp,pill,mkSwitch,segCtl,copy=Add.registerApp,Add.pill,Add.mkSwitch,Add.segCtl,Add.copy
+local function safe(tag,f,...) local ok,e=pcall(f,...) if not ok then warn("[iOS18 v12] "..tag..": "..tostring(e)) end return ok,e end
+local lt,ld=X.lkTime,X.lkDate
+S.lock.fx=S.lock.fx or "auto" S.lock.fxAmp=S.lock.fxAmp or 2 S.lock.fxSpd=S.lock.fxSpd or 2
+S.lock.dsrc=S.lock.dsrc or "none" S.lock.dsc=S.lock.dsc or 2 S.lock.dpos=S.lock.dpos or 2
+if S.lock.par==nil then S.lock.par=true end
+S.lock.wcyc=S.lock.wcyc or 0
+
+-- ---------------------------------------------------------------------
+-- keep the clock under the foreground layers and the rest above them
+-- ---------------------------------------------------------------------
+local fgHolder=X.fgHolder
+local fxHold=new("Frame",{Name="fxClock",Position=lt.Position,Size=lt.Size,BackgroundTransparency=1,ZIndex=1,Visible=false,Active=false},lockIn)
+local dimg=new("ImageLabel",{Name="depthImg",AnchorPoint=Vector2.new(.5,0),BackgroundTransparency=1,Image="",ScaleType=Enum.ScaleType.Fit,ZIndex=2,Visible=false,Active=false},lockIn)
+local function raise(c)
+if c==lt or c==ld or c==fgHolder or c==fxHold or c==dimg then return end
+if c:IsA("GuiObject") and c.ZIndex<3 then c.ZIndex=3 end end
+for _,c in ipairs(lockIn:GetChildren()) do raise(c) end
+lockIn.ChildAdded:Connect(function(c) task.defer(raise,c) end)
+lt.ZIndex=1 ld.ZIndex=1
+
+-- ---------------------------------------------------------------------
+-- DEPTH IMAGE (subject placed above the clock)
+-- ---------------------------------------------------------------------
+local function fileList()
+local out={}
+if type(listfiles)~="function" then return out end
+pcall(function() if makefolder and not isfolder("iOS18/depth") then makefolder("iOS18/depth") end end)
+local ok,items=pcall(listfiles,"iOS18/depth")
+if ok then for _,p in ipairs(items) do p=p:gsub("\\","/") local e=(p:match("%.(%w+)$") or ""):lower() if e=="png" or e=="webp" or e=="jpg" or e=="jpeg" then out[#out+1]=p end end end
+return out end
+local loadedSrc
+local function loadDepth()
+local src=S.lock.dsrc
+if src==loadedSrc then return end
+loadedSrc=src
+dimg.Image=""
+if src=="none" or not src then return end
+task.spawn(function()
+if src=="avatar" then
+local ok,u=pcall(function() return Players:GetUserThumbnailAsync(lp.UserId,Enum.ThumbnailType.AvatarThumbnail,Enum.ThumbnailSize.Size420x420) end)
+if ok and loadedSrc==src then dimg.Image=u end
+elseif src:sub(1,6)=="asset:" then dimg.Image="rbxassetid://"..src:sub(7)
+elseif src:sub(1,5)=="file:" then
+local ok,a=pcall(function() return getcustomasset(src:sub(6)) end)
+if ok and loadedSrc==src then dimg.Image=a end end end) end
+local DSC={.8,1,1.25,1.5}
+local DPOS={-50,0,60}
+local function layoutDepth()
+local s=W*DSC[S.lock.dsc]
+dimg.Size=UDim2.fromOffset(s,s*1.15)
+local off=0
+if S.lock.par then
+local m=UIS:GetMouseLocation()
+off=((m.X/math.max(1,gui.AbsoluteSize.X))-.5)*-14 end
+dimg.Position=UDim2.fromOffset(CX+off,60+DPOS[S.lock.dpos]) end
+
+-- ---------------------------------------------------------------------
+-- CLOCK FX ENGINE (water, glass, neon, flow, ripple)
+-- ---------------------------------------------------------------------
+local strips={}
+local N=22
+local sig=""
+local shine=nil
+local ripples={}
+local function mode()
+local m=S.lock.fx
+if m=="auto" then return X.teWave and "water" or "none" end
+return m end
+local function sigOf()
+return table.concat({tostring(lt.FontFace.Family),tostring(lt.FontFace.Weight),tostring(lt.TextColor3),tostring(lt.Size.Y.Offset),tostring(lt.Position.Y.Offset)},"|") end
+local function build()
+fxHold:ClearAllChildren() strips={}
+local lvl=X.perfLevel and X.perfLevel() or 1
+N=(lvl==3) and 12 or ((lvl==2) and 16 or 24)
+fxHold.Position=lt.Position fxHold.Size=lt.Size
+local sh=lt.Size.Y.Offset/N
+for i=0,N-1 do
+local f=new("Frame",{Position=UDim2.fromOffset(0,i*sh),Size=UDim2.fromOffset(W,sh+.6),BackgroundTransparency=1,ClipsDescendants=true,Active=false},fxHold)
+local c=lt:Clone() c.Visible=true c.Position=UDim2.fromOffset(0,-i*sh) c.Size=lt.Size
+c.Parent=f
+strips[#strips+1]={f=f,c=c,y=i*sh+sh/2} end
+shine=new("Frame",{Size=UDim2.fromOffset(60,lt.Size.Y.Offset),BackgroundColor3=WHITE,BackgroundTransparency=.88,BorderSizePixel=0,Visible=false,ZIndex=2,Active=false},fxHold)
+new("UIGradient",{Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(.5,0),NumberSequenceKeypoint.new(1,1)}),Rotation=20},shine)
+sig=sigOf() end
+local neon=new("UIStroke",{Name="NeonFx",Thickness=0,Color=WHITE,Transparency=0},lt)
+local flow=new("UIGradient",{Name="FlowFx",Enabled=false},lt)
+local function ripple(x,y) ripples[#ripples+1]={t=os.clock(),x=x,y=y} while #ripples>5 do table.remove(ripples,1) end end
+Add.clockRipple=function() ripple(W/2,lt.AbsolutePosition.Y+55) end
+conn(UIS.InputBegan,function(i,gp)
+if S.screen~="lock" or not lockL.Visible then return end
+if i.UserInputType~=Enum.UserInputType.MouseButton1 and i.UserInputType~=Enum.UserInputType.Touch then return end
+local m=mode()
+if m~="ripple" and m~="water" and m~="glass" then return end
+local k=math.max(.1,fxHold.AbsoluteSize.Y/math.max(1,lt.Size.Y.Offset))
+local pos=i.Position
+ripple((pos.X-fxHold.AbsolutePosition.X)/k,(pos.Y-fxHold.AbsolutePosition.Y)/k) end)
+local lastText,lastMin=lt.Text,""
+local AMP={5,9,15}
+local SPD={.6,1,1.7}
+conn(RunService.Heartbeat,function()
+if not (lockL.Visible and S.screen=="lock") then return end
+safe("depth",function() loadDepth() dimg.Visible=(S.lock.dsrc~="none") and dimg.Image~="" layoutDepth() end)
+local m=mode()
+-- neon / flow act directly on the clock
+neon.Thickness=(m=="neon") and (2.2+math.sin(os.clock()*3)*.8) or 0
+if m=="neon" then neon.Color=Color3.fromHSV((os.clock()*.08)%1,.7,1) neon.Transparency=.25+math.sin(os.clock()*3)*.15 end
+flow.Enabled=(m=="flow")
+if m=="flow" then
+local o=(os.clock()*.25)%1
+flow.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromHSV(o,.5,1)),ColorSequenceKeypoint.new(.5,Color3.fromHSV((o+.3)%1,.5,1)),ColorSequenceKeypoint.new(1,Color3.fromHSV((o+.6)%1,.5,1))}) end
+local strip=(m=="water" or m=="glass" or m=="ripple")
+if not strip then
+if fxHold.Visible then fxHold.Visible=false end
+if not lt.Visible then lt.Visible=true end
+return end
+if sigOf()~=sig or #strips==0 then build() end
+lt.Visible=false fxHold.Visible=true
+local t=os.clock()
+local amp=AMP[S.lock.fxAmp]*((m=="glass") and .45 or 1)
+local spd=SPD[S.lock.fxSpd]
+local txt=lt.Text
+local hm=os.date("%H%M")
+if hm~=lastMin then if lastMin~="" then Add.clockRipple() end lastMin=hm end
+for idx,s in ipairs(strips) do
+local x=0
+if m~="ripple" then
+x=amp*math.sin(t*2.1*spd+idx*.55)+amp*.5*math.sin(t*3.3*spd-idx*.9) end
+for _,r in ipairs(ripples) do
+local age=t-r.t
+if age<2.6 then
+local d=math.abs(s.y-r.y)
+x=x+(amp*1.6+4)*math.sin((d*.16)-age*9)*math.exp(-age*1.6)*math.exp(-d/90) end end
+s.c.Position=UDim2.fromOffset(x,s.c.Position.Y.Offset)
+if s.c.Text~=txt then s.c.Text=txt end
+s.c.TextTransparency=lt.TextTransparency+((m=="glass") and (.06*math.sin(t*2+idx*.4)+.04) or 0) end
+if m=="glass" then
+shine.Visible=true shine.Position=UDim2.fromOffset(((t*70*spd)%(W+200))-100,0)
+else shine.Visible=false end end)
+safe("build0",function() if mode()~="none" then build() end end)
+
+-- ---------------------------------------------------------------------
+-- WALLPAPER CYCLE
+-- ---------------------------------------------------------------------
+task.spawn(function()
+local last=os.time()
+while gui.Parent do
+task.wait(20)
+local mins=({0,5,15,60})[S.lock.wcyc+1 or 1] or 0
+if mins>0 and os.time()-last>=mins*60 and not CFG.WallpaperId then
+last=os.time()
+S.wall=S.wall%#WALLS+1 S.img=WALLS[S.wall].a
+pcall(X.applyWalls) end end end)
+
+-- ---------------------------------------------------------------------
+-- AOD: same font, color, weight and numerals as the lock screen
+-- ---------------------------------------------------------------------
+X.aodStyle=function(aodT,aodD,stb)
+pcall(function()
+aodT.FontFace=lt.FontFace aodD.FontFace=ld.FontFace
+aodT.TextScaled=true
+local tc=aodT:FindFirstChildOfClass("UITextSizeConstraint") or new("UITextSizeConstraint",{},aodT)
+local lc=lt:FindFirstChildOfClass("UITextSizeConstraint")
+tc.MaxTextSize=stb and 150 or (lc and lc.MaxTextSize or 92) tc.MinTextSize=20
+aodT.Size=UDim2.fromOffset(W,stb and 150 or lt.Size.Y.Offset)
+if not stb then
+local c=X.lockCol and X.lockCol() or WHITE
+aodT.TextColor3=c aodD.TextColor3=c end
+local ws=lt:FindFirstChild("WStroke")
+local as=aodT:FindFirstChild("WStroke") or new("UIStroke",{Name="WStroke",Thickness=0},aodT)
+as.Color=aodT.TextColor3 as.Thickness=ws and ws.Thickness or 0
+if X.lockNum then aodT.Text=X.lockNum(aodT.Text) end end) end
+
+-- ---------------------------------------------------------------------
+-- LOCK EFFECTS app
+-- ---------------------------------------------------------------------
+registerApp("lockfx","Lock Effects",C3(70,150,255),C3(30,70,200),function(f)
+sc(f,.5,.34,.6,.2,WHITE,.2) sc(f,.5,.7,.3,.3,C3(40,100,230),.5) end,BLUE,function(cont,app)
+local P=th() cont.BackgroundColor3=P.bg app.tint=P.text
+U.ttl(cont,P,"Lock Effects")
+local sf=U.sfm(cont,0,112,W,H-112)
+local y=0
+local render
+local function header(t) tx(sf,string.upper(t),32,y+2,W-64,18,12,P.sub,F_M,XL) y=y+24 end
+local function radio(rows,get,set)
+local g=fr(sf,16,y,W-32,#rows*52,P.card,0,14)
+local marks={}
+for i,r in ipairs(rows) do
+local ry=(i-1)*52
+tx(g,r[2],16,ry,W-110,52,16,P.text,F_M,XL)
+marks[i]=tx(g,(get()==r[1]) and "On" or "",W-32-70,ry,54,52,15,BLUE,F_B,XR)
+tbtn(g,0,ry,W-32,52,function() snd("tap") set(r[1]) for k,m in ipairs(marks) do m.Text=(get()==rows[k][1]) and "On" or "" end end)
+if i<#rows then fr(g,16,ry+51,W-64,1,P.sep) end end
+y=y+#rows*52+18 end
+header("Clock effect")
+radio({{"auto","Automatic (follows the wallpaper)"},{"none","None"},{"water","Water"},{"glass","Glass"},{"neon","Neon glow"},{"flow","Color flow"},{"ripple","Ripple on touch"}},
+function() return S.lock.fx end,function(v) S.lock.fx=v end)
+local st=tx(sf,"",24,y-10,W-48,30,12,P.sub,F_R,XL) st.TextWrapped=true st.TextYAlignment=Enum.TextYAlignment.Top
+addTicker(function() st.Text=X.teWave and "A wave effect was found in the current wallpaper pack. Automatic mode uses it." or "Automatic turns on Water when a wallpaper pack contains a wave layer, like Aqua Collection." end,st)
+y=y+34
+header("Strength and speed")
+segCtl(sf,P,16,y,W-32,{"Soft","Medium","Strong"},S.lock.fxAmp,function(i) S.lock.fxAmp=i end) y=y+46
+segCtl(sf,P,16,y,W-32,{"Slow","Normal","Fast"},S.lock.fxSpd,function(i) S.lock.fxSpd=i end) y=y+54
+header("Depth effect image")
+local opts={{"none","None"},{"avatar","My avatar"}}
+for _,p in ipairs(fileList()) do opts[#opts+1]={"file:"..p,p:match("([^/]+)$")} end
+opts[#opts+1]={"asset","Roblox asset ID..."}
+radio(opts,function() return S.lock.dsrc end,function(v)
+if v=="asset" then X.formSheet(cont,"Image asset ID",{"Asset ID"},function(vals) local n=tonumber(vals[1]) if not n then return false end S.lock.dsrc="asset:"..n loadedSrc=nil end)
+else S.lock.dsrc=v loadedSrc=nil end end)
+tx(sf,"Use a PNG with a transparent background. Put files in Workspace/iOS18/depth.",24,y-10,W-48,34,12,P.sub,F_R,XL).TextWrapped=true y=y+36
+segCtl(sf,P,16,y,W-32,{"Small","Normal","Large","Huge"},S.lock.dsc,function(i) S.lock.dsc=i end) y=y+46
+segCtl(sf,P,16,y,W-32,{"Higher","Center","Lower"},S.lock.dpos,function(i) S.lock.dpos=i end) y=y+54
+local pg=fr(sf,16,y,W-32,56,P.card,0,14)
+tx(pg,"Parallax with the mouse",16,0,W-130,56,16,P.text,F_M,XL)
+mkSwitch(pg,W-32-67,12,S.lock.par,function(v) S.lock.par=v end) y=y+74
+header("Wallpaper")
+segCtl(sf,P,16,y,W-32,{"Off","5 min","15 min","60 min"},S.lock.wcyc+1,function(i) S.lock.wcyc=i-1 end) y=y+54
+header("Looks")
+S.lockLooks=S.lockLooks or {}
+local KEYS={"font","color","weight","glass","num","hue","shade","widget","wk","fx","fxAmp","fxSpd","dsrc","dsc","dpos","par","b1","b2"}
+pill(sf,16,y,W-32,46,"Save current look",BLUE,WHITE,function()
+X.formSheet(cont,"Name this look",{"Name"},function(v)
+local nm=(v[1]~="" and v[1]) or ("Look "..(#S.lockLooks+1))
+local L={name=nm,wall=S.wall,v={}}
+for _,k in ipairs(KEYS) do L.v[k]=S.lock[k] end
+S.lockLooks[#S.lockLooks+1]=L X.island("Look saved",1.6) end) end,16) y=y+56
+for i,L in ipairs(S.lockLooks) do
+local r=fr(sf,16,y,W-32,52,P.card,0,14)
+tx(r,L.name,16,0,W-190,52,16,P.text,F_M,XL).TextTruncate=Enum.TextTruncate.AtEnd
+pill(r,W-32-168,10,76,32,"Apply",BLUE,WHITE,function()
+for _,k in ipairs(KEYS) do S.lock[k]=L.v[k] end
+if L.wall and not CFG.WallpaperId then S.wall=L.wall S.img=WALLS[S.wall].a pcall(X.applyWalls) end
+loadedSrc=nil pcall(X.applyLockStyle) pcall(Add.paintLockBtns) X.island("Look applied",1.6) end,13)
+pill(r,W-32-84,10,72,32,"Delete",C3(70,70,78),WHITE,function() table.remove(S.lockLooks,i) X.island("Look deleted",1.4) end,13)
+y=y+60 end
+y=y+10
+pill(sf,16,y,W-32,46,"Preview on the lock screen",BLUE,WHITE,function() X.lockNow(true) end,16) y=y+60
+sf.CanvasSize=UDim2.fromOffset(0,y+40) end)
+-- show the new app inside Tools Plus
+do
+local folder
+for _,it in ipairs(S.home[2]) do if type(it)=="table" and it.name=="Tools Plus" then folder=it end end
+local found=false
+for p=1,2 do for _,it in ipairs(S.home[p]) do if it=="lockfx" then found=true elseif type(it)=="table" and it.ids then for _,x in ipairs(it.ids) do if x=="lockfx" then found=true end end end end end
+if not found and not S.deleted.lockfx and not S.hidden.lockfx then
+if not folder then folder={folder=true,name="Tools Plus",ids={}} table.insert(S.home[2],folder) end
+table.insert(folder.ids,"lockfx") end
+safe("norm",X.normalize) safe("home",X.buildHome) end
+end)()
+
+-- =====================================================================
+-- v12 EXTRA IDEAS: briefing, stand reminders, weekly report,
+-- suggestions widget, lock looks
+-- =====================================================================
+;(function()
+local Add=X.add
+local function safe(tag,f,...) local ok,e=pcall(f,...) if not ok then warn("[iOS18 v12] "..tag..": "..tostring(e)) end return ok,e end
+local function dayRec(k) return S.st and S.st.days[k or os.date("%Y%m%d")] end
+-- good morning briefing at 08:00
+task.spawn(function()
+while gui.Parent do
+task.wait(30)
+local d=os.date("*t")
+if X.opt("briefing",true) and d.hour==8 and d.min<10 and S.briefDay~=os.date("%Y%m%d") then
+S.briefDay=os.date("%Y%m%d")
+local n=0 for _,r in ipairs(S.rems) do if not r.d then n=n+1 end end
+local ev=S.events[d.year.."-"..d.month.."-"..d.day]
+local e=(ev and #ev or 0)
+X.pushNotif("reminders","Good morning, "..tostring(CFG.UserName or "there"),n.." reminders and "..e.." events today") end end end)
+-- time to stand
+task.spawn(function()
+while gui.Parent do
+task.wait(55)
+local d=os.date("*t")
+if X.opt("standRem",true) and d.min==50 and d.hour>=10 and d.hour<=18 and S.health and not S.health.stand["h"..string.format("%02d",d.hour)] and not S.focus then
+X.pushNotif("health","Time to stand","You have been still this hour. Move around for a minute.") end end end)
+-- weekly screen time report on Sunday evening
+task.spawn(function()
+while gui.Parent do
+task.wait(60)
+local d=os.date("*t")
+if X.opt("weekRep",true) and d.wday==1 and d.hour==18 and d.min<5 and S.weekDay~=os.date("%Y%m%d") then
+S.weekDay=os.date("%Y%m%d")
+local tot=0
+for i=0,6 do local r=dayRec(os.date("%Y%m%d",os.time()-i*86400)) if r then for _,v in pairs(r.apps) do tot=tot+v end end end
+X.pushNotif("screentime","Weekly report","Your daily average was "..math.floor(tot/7/60).." minutes this week.") end end end)
+-- suggestions widget: your most used apps
+local function topApps()
+local use={}
+for i=0,6 do local r=dayRec(os.date("%Y%m%d",os.time()-i*86400)) if r then for id,v in pairs(r.apps) do use[id]=(use[id] or 0)+v end end end
+local list={}
+for id,v in pairs(use) do if APP[id] and not S.hidden[id] then list[#list+1]={id,v} end end
+table.sort(list,function(a,b) return a[2]>b[2] end)
+local out={}
+for _,e in ipairs(list) do if #out<4 then out[#out+1]=e[1] end end
+for _,id in ipairs({"messages","safari","camera","music","photos"}) do if #out<4 then local have=false for _,x in ipairs(out) do if x==id then have=true end end if not have and APP[id] then out[#out+1]=id end end end
+return out end
+X.WCAT[#X.WCAT+1]={id="suggestw",name="Siri Suggestions",size="s",app="settings",glyph="S",own=true,draw=function(w,P)
+tx(w,"Suggestions",14,10,130,18,13,P.sub,F_B,XL)
+for i,id in ipairs(topApps()) do
+local col,row=(i-1)%2,math.floor((i-1)/2)
+local ic=new("Frame",{Position=UDim2.fromOffset(16+col*70,36+row*58),Size=UDim2.fromOffset(52,52),BackgroundTransparency=1},w)
+mkIcon(ic,APP[id],52,0,0)
+tbtn(ic,0,0,52,52,function() X.openApp(id) end) end end}
+X.WBY.suggestw=X.WCAT[#X.WCAT]
+end)()
+
+-- =====================================================================
+-- v13: NEW VOLUME BAR (elastic), expanded mixer with timers,
+--      game screen rotation
+-- =====================================================================
+;(function()
+local Add=X.add
+local pill=Add.pill
+local function safe(tag,f,...) local ok,e=pcall(f,...) if not ok then warn("[iOS18 v13] "..tag..": "..tostring(e)) end return ok,e end
+local function clamp01(v) return math.clamp(v,0,1) end
+S.ringVol=S.ringVol or .7 S.alarmVol=S.alarmVol or .8 S.notifVol=S.notifVol or .6
+S.volSide=S.volSide or "L"
+local TW,TH,BH=60,176,44
+local BLUEI=C3(10,132,255)
+local TRACKC=C3(14,26,78)
+local hud=new("Frame",{Name="volHud",Size=UDim2.fromOffset(TW,TH+10+BH+10+BH),BackgroundTransparency=1,Visible=false,ZIndex=800},screen)
+local hudS=new("UIScale",{Scale=.8},hud)
+local catch=new("TextButton",{Size=UDim2.fromOffset(W,H),BackgroundTransparency=1,Text="",AutoButtonColor=false,ZIndex=799,Visible=false},screen)
+local springs={}
+local lastAct=0
+local expanded=false
+local exp
+local function place()
+local x=(S.volSide=="L") and 10 or (W-10-TW)
+hud.Position=UDim2.fromOffset(x,CY-150) end
+place()
+-- ---------------------------------------------------------------- icons
+local function clear(f) for _,c in ipairs(f:GetChildren()) do c:Destroy() end end
+local function spk(par,cx,cy,col,lvl)
+ctr(par,cx-6,cy,6,9,col,1.5) ctr(par,cx-1,cy,9,9,col,1.5,45)
+if lvl>.05 then ctr(par,cx+8,cy,2,6,col,1) end
+if lvl>.4 then ctr(par,cx+12,cy,2,11,col,1) end
+if lvl>.75 then ctr(par,cx+16,cy,2,16,col,1) end end
+local function bell(par,cx,cy,col,slash)
+ctr(par,cx,cy-8,3,3,col,1.5) ctr(par,cx,cy-2,14,14,col,7) ctr(par,cx,cy+4,18,7,col,2) ctr(par,cx,cy+10,5,4,col,2)
+if slash then ctr(par,cx,cy,26,2.4,RED,1.2,-45) end end
+local function moon(par,cx,cy,col,bg)
+ctr(par,cx,cy,20,20,col,10) ctr(par,cx+6,cy-4,17,17,bg,8.5) end
+local function alarmI(par,cx,cy,col)
+local o=ctr(par,cx,cy+1,16,16,col,8) o.BackgroundTransparency=1 new("UIStroke",{Color=col,Thickness=1.8},o)
+ctr(par,cx,cy-1,1.8,6,col,.9) ctr(par,cx+2,cy+2,5,1.8,col,.9) ctr(par,cx-9,cy-8,5,3,col,1.5,-40) ctr(par,cx+9,cy-8,5,3,col,1.5,40) end
+local function msgI(par,cx,cy,col)
+ctr(par,cx,cy-1,16,12,col,3) ctr(par,cx-4,cy+6,5,5,col,1,45) end
+-- ---------------------------------------------------------------- slider
+local function mkVSlider(par,bx,by,w,h,r,get,set,icon)
+local o={pv=get(),vv=0,tv=get(),w=w,h=h,bx=bx,by=by,state=nil}
+local track=fr(par,bx,by,w,h,TRACKC,.38,r) track.ClipsDescendants=true
+new("UIStroke",{Color=WHITE,Transparency=.88,Thickness=1},track)
+local fill=fr(track,0,h,w,0,WHITE,0,r)
+local ic=new("Frame",{Position=UDim2.fromOffset(0,h-38),Size=UDim2.fromOffset(w,34),BackgroundTransparency=1,ZIndex=3},track)
+local hit=new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",AutoButtonColor=false,ZIndex=6},track)
+o.track=track
+function o.apply(pv)
+local ex=math.max(0,pv-1)
+local neg=math.min(0,pv)
+local th0=h*(1+ex*.28+neg*.22)
+local tw0=w+ex*14-neg*10
+track.Size=UDim2.fromOffset(tw0,th0)
+track.Position=UDim2.fromOffset(bx-(tw0-w)/2,by-(th0-h)+((neg<0) and 0 or 0))
+local fh=math.clamp(pv,0,1)*th0
+fill.Size=UDim2.fromOffset(tw0,fh) fill.Position=UDim2.fromOffset(0,th0-fh)
+ic.Position=UDim2.fromOffset(0,th0-38) ic.Size=UDim2.fromOffset(tw0,34)
+local blue=fh>26
+local lv=clamp01(pv)
+local key=(blue and "b" or "w")..math.floor(lv*3)
+if o.state~=key then
+o.state=key clear(ic)
+icon(ic,tw0/2,17,blue and BLUEI or WHITE,lv) end end
+o.apply(o.pv)
+local dragging=false
+local function fromPos(pos)
+local raw=1-(pos.Y-track.AbsolutePosition.Y)/math.max(1,track.AbsoluteSize.Y)
+set(clamp01(raw))
+if raw>1 then o.tv=1+(raw-1)*.45 elseif raw<0 then o.tv=raw*.45 else o.tv=raw end
+lastAct=os.clock() end
+hit.InputBegan:Connect(function(i)
+if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then dragging=true fromPos(i.Position) end end)
+local c1=UIS.InputChanged:Connect(function(i)
+if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then fromPos(i.Position) end end)
+local c2=UIS.InputEnded:Connect(function(i)
+if dragging and (i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch) then dragging=false o.tv=get() lastAct=os.clock() end end)
+track.AncestryChanged:Connect(function() if not track.Parent then c1:Disconnect() c2:Disconnect() end end)
+function o.sync() if not dragging then o.tv=get() end end
+springs[#springs+1]=o
+return o end
+-- ---------------------------------------------------------------- compact HUD
+local vs=mkVSlider(hud,0,0,TW,TH,22,function() return S.vol end,function(v) S.vol=v end,spk)
+local dots=new("Frame",{Position=UDim2.fromOffset(0,6),Size=UDim2.fromOffset(TW,20),BackgroundTransparency=1,ZIndex=8},vs.track)
+for i=0,2 do ctr(dots,TW/2-10+i*10,10,5,5,C3(200,215,255),2.5) end
+local function mkRound(y)
+local b=fr(hud,0,y,TW,BH,C3(94,94,102),.12,BH/2)
+new("UIStroke",{Color=WHITE,Transparency=.9,Thickness=1},b)
+local ic=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1},b)
+return b,ic end
+local bellB,bellI=mkRound(TH+10)
+local moonB,moonI=mkRound(TH+10+BH+10)
+local bellRot=0
+local function drawBell() clear(bellI) bell(bellI,TW/2,BH/2,WHITE,S.silent) end
+local function drawMoon() clear(moonI) moon(moonI,TW/2,BH/2,WHITE,S.focus and PURPLE or C3(94,94,102)) moonB.BackgroundColor3=S.focus and PURPLE or C3(94,94,102) end
+drawBell() drawMoon()
+local function shake(f)
+task.spawn(function()
+local t0=os.clock()
+while f.Parent and os.clock()-t0<.7 do
+local t=os.clock()-t0
+f.Rotation=18*math.sin(t*34)*math.exp(-t*6)
+task.wait() end
+f.Rotation=0 end) end
+local function bounceBtn(b)
+task.spawn(function()
+local t0=os.clock()
+while b.Parent and os.clock()-t0<.6 do
+local t=os.clock()-t0
+local s=1+.18*math.exp(-t*7)*math.cos(t*22)
+b.Size=UDim2.fromOffset(TW*s,BH*s) b.Position=UDim2.fromOffset(-(TW*s-TW)/2,b.Position.Y.Offset)
+task.wait() end
+b.Size=UDim2.fromOffset(TW,BH) b.Position=UDim2.fromOffset(0,b.Position.Y.Offset) end) end
+local function toggleSilent()
+S.silent=not S.silent drawBell() shake(bellI) X.haptic()
+Add.vt.silent=nil lastAct=os.clock() end
+local function toggleFocus()
+Add.setMode(S.focus and nil or "Do Not Disturb") drawMoon() bounceBtn(moonB)
+Add.vt.focus=nil lastAct=os.clock() end
+Add.vt=Add.vt or {}
+tbtn(bellB,0,0,TW,BH,toggleSilent)
+tbtn(moonB,0,0,TW,BH,toggleFocus)
+-- ---------------------------------------------------------------- expanded panel
+local PW,PH=266,306
+local function mkTimerRow(par,y,kind,iconDraw)
+local b=fr(par,14,y,52,44,C3(90,100,130),.3,22)
+local ic=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1},b)
+local cap=fr(par,74,y,PW-14-74,44,C3(90,100,130),.3,22) cap.ClipsDescendants=true
+local pf=fr(cap,0,0,0,44,C3(210,225,255),.15,22)
+local lbl=tx(cap,"Slide to set timer",0,0,PW-14-74,44,15,WHITE,F_M)
+local function paint()
+clear(ic)
+if kind=="silent" then bell(ic,26,22,WHITE,S.silent) else moon(ic,26,22,WHITE,S.focus and PURPLE or C3(90,100,130)) b.BackgroundColor3=S.focus and PURPLE or C3(90,100,130) end end
+paint()
+tbtn(b,0,0,52,44,function() if kind=="silent" then toggleSilent() else toggleFocus() end paint() end)
+local mins,dragging=0,false
+local function fromPos(pos)
+local f=clamp01((pos.X-cap.AbsolutePosition.X)/math.max(1,cap.AbsoluteSize.X))
+mins=math.floor(f*24+.5)*5
+pf.Size=UDim2.fromOffset((PW-14-74)*f,44)
+lbl.Text=(mins==0) and "Off" or (mins>=60 and (math.floor(mins/60).." h "..(mins%60>0 and (mins%60).." min" or "")) or (mins.." min"))
+lastAct=os.clock() end
+local hit=tbtn(cap,0,0,PW-14-74,44,function() end)
+hit.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then dragging=true fromPos(i.Position) end end)
+local c1=UIS.InputChanged:Connect(function(i) if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then fromPos(i.Position) end end)
+local c2=UIS.InputEnded:Connect(function(i)
+if dragging and (i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch) then
+dragging=false
+if mins>0 then
+Add.vt[kind]=os.clock()+mins*60
+if kind=="silent" then S.silent=true else Add.setMode("Do Not Disturb") end
+X.island((kind=="silent" and "Silent for " or "Focus for ")..lbl.Text,2)
+else Add.vt[kind]=nil end
+paint() drawBell() drawMoon() end end)
+cap.AncestryChanged:Connect(function() if not cap.Parent then c1:Disconnect() c2:Disconnect() end end)
+addTicker(function()
+local e=Add.vt[kind]
+if e and e>os.clock() then
+local left=e-os.clock()
+lbl.Text=string.format("%d:%02d left",math.floor(left/60),math.floor(left)%60)
+pf.Size=UDim2.fromOffset(PW-14-74,44)
+elseif not dragging then lbl.Text="Slide to set timer" pf.Size=UDim2.fromOffset(0,44) end
+paint() end,cap) end
+local function collapse()
+if not expanded then return end
+expanded=false catch.Visible=false
+if exp then local e=exp exp=nil
+for i=#springs,1,-1 do if springs[i].track:IsDescendantOf(e) then table.remove(springs,i) end end
+tw(e,.18,{GroupTransparency=1}) task.delay(.2,function() e:Destroy() end) end
+hud.Visible=true hudS.Scale=.85 tw(hudS,.35,{Scale=1},EZ.Back) end
+local function expand()
+if expanded then return end
+expanded=true catch.Visible=true lastAct=os.clock()
+hud.Visible=false
+local x=(S.volSide=="L") and 10 or (W-10-PW)
+exp=new("CanvasGroup",{Name="volPanel",Position=UDim2.fromOffset(x,CY-170),Size=UDim2.fromOffset(PW,PH),BackgroundColor3=C3(18,34,56),BackgroundTransparency=.3,BorderSizePixel=0,GroupTransparency=1,ZIndex=800},screen)
+cor(exp,30) new("UIStroke",{Color=WHITE,Transparency=.85,Thickness=1},exp)
+local es=new("UIScale",{Scale=.82},exp)
+tw(exp,.25,{GroupTransparency=0}) tw(es,.5,{Scale=1},EZ.Back)
+local chans={{function() return S.vol end,function(v) S.vol=v end,spk},{function() return S.ringVol end,function(v) S.ringVol=v end,function(p,cx,cy,c) bell(p,cx,cy,c,false) end},
+{function() return S.alarmVol end,function(v) S.alarmVol=v end,alarmI},{function() return S.notifVol end,function(v) S.notifVol=v end,msgI}}
+for i,c in ipairs(chans) do mkVSlider(exp,14+(i-1)*62,14,52,132,20,c[1],c[2],c[3]) end
+mkTimerRow(exp,158,"silent")
+mkTimerRow(exp,210,"focus")
+local sideL=pill(exp,14,264,(PW-36)/2,30,"Left",(S.volSide=="L") and BLUEI or C3(70,80,110),WHITE,function() S.volSide="L" collapse() end,13)
+local sideR=pill(exp,22+(PW-36)/2,264,(PW-36)/2,30,"Right",(S.volSide=="R") and BLUEI or C3(70,80,110),WHITE,function() S.volSide="R" collapse() end,13) end
+catch.MouseButton1Click:Connect(collapse)
+tbtn(dots,0,-6,TW,26,function() expand() end).ZIndex=9
+-- ---------------------------------------------------------------- show / loop
+local showing=false
+local function show()
+lastAct=os.clock()
+place() drawBell() drawMoon()
+if expanded or showing then return end
+showing=true hud.Visible=true hudS.Scale=.8 tw(hudS,.45,{Scale=1},EZ.Back)
+vs.pv=vs.pv-.12 end
+X.volHud=function() show() end
+Add.showVolume=show
+local lastVol,lastSilent,lastFocus=S.vol,S.silent,S.focus
+conn(RunService.Heartbeat,function(dt)
+dt=math.min(dt,.033)
+if S.vol~=lastVol then lastVol=S.vol if not S.ccOpen then show() end end
+if S.silent~=lastSilent then lastSilent=S.silent drawBell() if not S.ccOpen then show() shake(bellI) end end
+if S.focus~=lastFocus then lastFocus=S.focus drawMoon() end
+if showing or expanded then
+for _,o in ipairs(springs) do
+if o.track.Parent then
+o.sync()
+local a=(o.tv-o.pv)*300-o.vv*15
+o.vv=o.vv+a*dt o.pv=o.pv+o.vv*dt
+o.apply(o.pv) end end
+local idle=os.clock()-lastAct
+if not expanded and idle>2.2 then
+showing=false
+tw(hudS,.25,{Scale=.9}) task.delay(.25,function() if not showing and not expanded then hud.Visible=false end end)
+elseif expanded and idle>7 then collapse() end end end)
+-- timers
+task.spawn(function()
+while gui.Parent do
+task.wait(1)
+local now=os.clock()
+if Add.vt.silent and now>=Add.vt.silent then Add.vt.silent=nil S.silent=false drawBell() X.island("Silent mode ended",1.8) end
+if Add.vt.focus and now>=Add.vt.focus then Add.vt.focus=nil Add.setMode(nil) drawMoon() end end end)
+-- ---------------------------------------------------------------------
+-- GAME SCREEN ROTATION (Roblox PlayerGui orientation)
+-- ---------------------------------------------------------------------
+Add.setGameOri=function(mode,quiet)
+S.opt.gameOri=mode
+local e=Enum.ScreenOrientation
+local val=(mode=="portrait") and e.Portrait or ((mode=="landscape") and e.LandscapeSensor or e.Sensor)
+local ok=pcall(function() lp:WaitForChild("PlayerGui").ScreenOrientation=val end)
+pcall(function() game:GetService("StarterGui").ScreenOrientation=val end)
+if not quiet then X.island(({landscape="Game: Landscape",auto="Game: Auto rotate",portrait="Game: Portrait"})[mode]..(ok and "" or " (not supported here)"),2.2) end
+return ok end
+Add.cycleGameOri=function()
+local order={"landscape","auto","portrait"}
+local cur=S.opt.gameOri or "auto" local i=1 for k,v in ipairs(order) do if v==cur then i=k end end
+Add.setGameOri(order[i%#order+1]) end
+if S.opt.gameOri then task.delay(1.5,function() Add.setGameOri(S.opt.gameOri,true) end) end
 end)()
 
 X.applyWalls() X.rebuildWidgets() setPage(1,true) X.refreshStatus() X.updFlash()
