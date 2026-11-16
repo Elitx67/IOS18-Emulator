@@ -15,11 +15,9 @@ W=390,H=844,rad=47,brad=58,pl=11,pr=11,pt=11,pb=11,island=true,notch=false,btn=f
 {id="xsmax",name="iPhone XS Max",model="MT5D2LL/A",chip="A12 Bionic",sub1="Notch",sub2="Face ID  -  Gesture bar",sub3="Dynamic Island tweak",
 W=390,H=844,rad=40,brad=52,pl=10,pr=10,pt=10,pb=10,island=false,notch=true,btn=false,touch=false,sbH=48,islY=36,hint="Swipe up to open",action=false,rows=6},
 {id="8plus",name="iPhone 8 Plus",model="MQ8D2LL/A",chip="A11 Bionic",sub1="Home button",sub2="Touch ID  -  No gesture bar",sub3="Gesture and Island tweaks",
-W=390,H=694,rad=10,brad=48,pl=14,pr=14,pt=66,pb=88,island=false,notch=false,btn=true,touch=true,sbH=20,islY=26,hint="Press home to open",action=false,rows=5}}
+W=390,H=694,rad=10,brad=48,pl=14,pr=14,pt=66,pb=88,island=false,notch=false,btn=true,touch=true,sbH=20,islY=26,hint="Press home to open",action=false,rows=6}}
 local DEVICE
 do
-local ipadHex="2a20693b4c57093433403c6e5b01222074636c020473720079047b0178293b2f485f0f0d1b7d62305a383379157a1b08412f301c64045d2328643d250d434035355f3c20416a3031367910675d2f3145791a76716369746b795c427a30582d275d3f783721291e0e793f2b00353c513a26207429585a5e3e697a64620369737f1c7615010261204c3d6e00637826262a490e016e695d356e0367783426761c05092a2610686509212179657d165a413633433d6e54302f373170435c46393a103f325e22267f363f430e543b3e5e3c68463e36273c764b525e2937162a317a6c71706f225e5f6b67611d623b5b3f3779073c4443577a275d79275d712c3431251652512e3b42376e54302f3731705f5c45296f1862305d3d307962"
-local ipadA,ipadB=348591404,1767982218
 local sg=Instance.new("ScreenGui")
 sg.Name="iOS18_DeviceSelect" sg.IgnoreGuiInset=true sg.ResetOnSpawn=false sg.DisplayOrder=1001 sg.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
 pcall(function() sg.Parent=(gethui and gethui()) or CoreGui end)
@@ -31,16 +29,16 @@ o.Parent=par return o end
 local function rc(o,r) mk("UICorner",{CornerRadius=UDim.new(0,r)},o) return o end
 local bg=mk("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(10,10,16),BorderSizePixel=0,Active=true},sg)
 mk("UIGradient",{Color=ColorSequence.new(Color3.fromRGB(26,26,44),Color3.fromRGB(6,6,10)),Rotation=90},bg)
-local root=mk("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(940,560),BackgroundTransparency=1},bg)
+local root=mk("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(700,560),BackgroundTransparency=1},bg)
 local rs=mk("UIScale",{},root)
 local function fitSel()
 local a=sg.AbsoluteSize
 if a.X<50 then return end
-rs.Scale=math.clamp(math.min((a.X-24)/940,(a.Y-24)/560),.35,1.4) end
+rs.Scale=math.clamp(math.min((a.X-24)/700,(a.Y-24)/560),.35,1.4) end
 fitSel() sg:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitSel)
-mk("TextLabel",{Size=UDim2.fromOffset(940,44),Position=UDim2.fromOffset(0,10),BackgroundTransparency=1,Text="Choose your iPhone",TextColor3=Color3.new(1,1,1),
+mk("TextLabel",{Size=UDim2.fromOffset(700,44),Position=UDim2.fromOffset(0,10),BackgroundTransparency=1,Text="Choose your iPhone",TextColor3=Color3.new(1,1,1),
 Font=Enum.Font.GothamBold,TextSize=34},root)
-mk("TextLabel",{Size=UDim2.fromOffset(940,24),Position=UDim2.fromOffset(0,58),BackgroundTransparency=1,Text="Screen, gestures, notch and buttons follow the real device. Tweaks can add missing features.",
+mk("TextLabel",{Size=UDim2.fromOffset(700,24),Position=UDim2.fromOffset(0,58),BackgroundTransparency=1,Text="Screen, gestures, notch and buttons follow the real device. Tweaks can add missing features.",
 TextColor3=Color3.fromRGB(160,160,175),Font=Enum.Font.Gotham,TextSize=15},root)
 local choice
 local last=genv.__IOS18_LASTDEV or "16pro"
@@ -85,73 +83,12 @@ card.Position=UDim2.fromOffset(x,150) card.BackgroundTransparency=1
 task.delay(.06*i,function() game:GetService("TweenService"):Create(card,TweenInfo.new(.45,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Position=UDim2.fromOffset(x,110),BackgroundTransparency=0}):Play() end) end
 local kc=UIS.InputBegan:Connect(function(i)
 if i.KeyCode==Enum.KeyCode.One then choice=DEVICES[1] elseif i.KeyCode==Enum.KeyCode.Two then choice=DEVICES[2] elseif i.KeyCode==Enum.KeyCode.Three then choice=DEVICES[3] end end)
-do
-local i=4 local d={name="iPad (A16)",chip="A16 — WIP",sub1="Work in progress",sub2="Key-locked",sub3="Developer build",id="__pad_locked__",_locked=true,island=false,notch=false,btn=false,rows=5}
-local pw,ph=96,142
-local x=(700-(3*212+2*20))/2+(i-1)*(212+20)
-local card=mk("TextButton",{Position=UDim2.fromOffset(x,110),Size=UDim2.fromOffset(212,420),BackgroundColor3=Color3.fromRGB(28,28,38),Text="",AutoButtonColor=false,BorderSizePixel=0},root) rc(card,22)
-mk("UIStroke",{Color=Color3.fromRGB(80,80,100),Thickness=1.5},card)
-local sc4=mk("UIScale",{},card)
-local fx,fy=(212-pw)/2,22
-local body=mk("Frame",{Position=UDim2.fromOffset(fx,fy),Size=UDim2.fromOffset(pw,ph+40),BackgroundColor3=Color3.fromRGB(20,20,24),BorderSizePixel=0},card) rc(body,10)
-mk("UIStroke",{Color=Color3.fromRGB(100,100,110),Thickness=2},body)
-local scr=mk("Frame",{Position=UDim2.fromOffset(4,4),Size=UDim2.fromOffset(pw-8,ph+40-8),BackgroundColor3=Color3.fromRGB(40,40,80),BorderSizePixel=0,ClipsDescendants=true},body) rc(scr,7)
-mk("UIGradient",{Color=ColorSequence.new(Color3.fromRGB(80,80,120),Color3.fromRGB(40,40,70)),Rotation=65},scr)
--- lock icon
-mk("TextLabel",{Size=UDim2.fromOffset(pw-8,ph+40-8),BackgroundTransparency=1,Text="🔒",TextSize=32,Font=Enum.Font.GothamBold,TextColor3=Color3.fromRGB(180,180,200)},scr)
--- pill "WIP"
-local wip=mk("Frame",{AnchorPoint=Vector2.new(.5,0),Position=UDim2.fromOffset((pw-8)/2,8),Size=UDim2.fromOffset(54,20),BackgroundColor3=Color3.fromRGB(255,159,10),BorderSizePixel=0},scr) rc(wip,10)
-mk("TextLabel",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="WIP",TextColor3=Color3.new(1,1,1),Font=Enum.Font.GothamBold,TextSize=12},wip)
-local y0=fy+ph+40+22
-mk("TextLabel",{Position=UDim2.fromOffset(0,y0),Size=UDim2.fromOffset(212,26),BackgroundTransparency=1,Text=d.name,TextColor3=Color3.new(1,1,1),Font=Enum.Font.GothamBold,TextSize=19},card)
-mk("TextLabel",{Position=UDim2.fromOffset(0,y0+26),Size=UDim2.fromOffset(212,18),BackgroundTransparency=1,Text=d.chip,TextColor3=Color3.fromRGB(150,150,165),Font=Enum.Font.Gotham,TextSize=13},card)
-for k,t in ipairs({d.sub1,d.sub2,d.sub3}) do mk("TextLabel",{Position=UDim2.fromOffset(0,y0+54+(k-1)*20),Size=UDim2.fromOffset(212,18),BackgroundTransparency=1,Text=t,TextColor3=(k==3) and Color3.fromRGB(255,159,10) or Color3.fromRGB(205,205,215),Font=Enum.Font.GothamMedium,TextSize=13},card) end
-local sel4=mk("Frame",{Position=UDim2.fromOffset(32,376),Size=UDim2.fromOffset(148,32),BackgroundColor3=Color3.fromRGB(80,80,100),BorderSizePixel=0},card) rc(sel4,16)
-mk("TextLabel",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="🔑  Enter Key",TextColor3=Color3.new(1,1,1),Font=Enum.Font.GothamBold,TextSize=14},sel4)
-card.MouseEnter:Connect(function() game:GetService("TweenService"):Create(sc4,TweenInfo.new(.18),{Scale=1.04}):Play() end)
-card.MouseLeave:Connect(function() game:GetService("TweenService"):Create(sc4,TweenInfo.new(.18),{Scale=1}):Play() end)
-card.MouseButton1Click:Connect(function() choice=d end)
-card.Position=UDim2.fromOffset(x,150) card.BackgroundTransparency=1
-task.delay(.06*i,function() game:GetService("TweenService"):Create(card,TweenInfo.new(.45,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Position=UDim2.fromOffset(x,110),BackgroundTransparency=0}):Play() end)
-end
 mk("TextLabel",{Position=UDim2.fromOffset(0,534),Size=UDim2.fromOffset(700,20),BackgroundTransparency=1,Text="Tip: you can also press 1, 2 or 3",TextColor3=Color3.fromRGB(110,110,125),Font=Enum.Font.Gotham,TextSize=13},root)
 if type(genv.__IOS18_PICK)=="number" then choice=DEVICES[genv.__IOS18_PICK] or DEVICES[1] end
--- main wait loop: waits for a valid DEVICE or key confirmation
-local finalDev=nil
-while not finalDev do
 kc:Disconnect()
 while not choice do task.wait(.03) end
-if not choice._locked then
-finalDev=choice
-else
--- show key prompt over selector
-local over=mk("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=.5,BorderSizePixel=0,ZIndex=20},root)
-local box=mk("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(360,178),BackgroundColor3=Color3.fromRGB(28,28,38),BorderSizePixel=0,ZIndex=21},root) rc(box,20)
-mk("UIStroke",{Color=Color3.fromRGB(10,132,255),Thickness=2},box)
-mk("TextLabel",{Position=UDim2.fromOffset(0,16),Size=UDim2.fromOffset(360,28),BackgroundTransparency=1,Text="Developer Key Required",TextColor3=Color3.new(1,1,1),Font=Enum.Font.GothamBold,TextSize=18,ZIndex=22},box)
-mk("TextLabel",{Position=UDim2.fromOffset(0,46),Size=UDim2.fromOffset(360,20),BackgroundTransparency=1,Text="Enter the key to unlock this build",TextColor3=Color3.fromRGB(160,160,175),Font=Enum.Font.Gotham,TextSize=13,ZIndex=22},box)
-local inp2=mk("TextBox",{Position=UDim2.fromOffset(20,76),Size=UDim2.fromOffset(320,36),BackgroundColor3=Color3.fromRGB(44,44,56),BorderSizePixel=0,Text="",PlaceholderText="XXXX-XXXX-XXXX",TextColor3=Color3.new(1,1,1),Font=Enum.Font.GothamMedium,TextSize=15,ClearTextOnFocus=false,ZIndex=22},box) rc(inp2,10)
-local errL=mk("TextLabel",{Position=UDim2.fromOffset(0,118),Size=UDim2.fromOffset(360,20),BackgroundTransparency=1,Text="",TextColor3=Color3.fromRGB(255,69,58),Font=Enum.Font.Gotham,TextSize=13,ZIndex=22},box)
-local result=nil
-local function tryKey(pk)
-local ka,kb2=0,0
-for i=1,#pk do local c=pk:byte(i) ka=(ka*31+c)%4294967291 kb2=(kb2*131+c)%2147483629 end
-if ka~=348591404 or kb2~=1767982218 then errL.Text="Incorrect key." return end
-local out,n={},0
-for h in ipadHex:gmatch("%x%x") do n=n+1 out[n]=string.char(bit32.bxor(tonumber(h,16),pk:byte((n-1)%#pk+1))) end
-local d={}
-for k,v in table.concat(out):gmatch("(%w+)=([^;]*)") do local nv=tonumber(v) if nv~=nil then d[k]=nv elseif v=="true" then d[k]=true elseif v=="false" then d[k]=false else d[k]=v end end
-result=d end
-inp2.FocusLost:Connect(function(enter) if enter then tryKey(inp2.Text) end end)
-mk("TextButton",{Position=UDim2.fromOffset(20,146),Size=UDim2.fromOffset(148,24),BackgroundColor3=Color3.fromRGB(10,132,255),BorderSizePixel=0,Text="Confirm",TextColor3=Color3.new(1,1,1),Font=Enum.Font.GothamBold,TextSize=14,ZIndex=22},box).MouseButton1Click:Connect(function() tryKey(inp2.Text) end)
-mk("TextButton",{Position=UDim2.fromOffset(192,146),Size=UDim2.fromOffset(148,24),BackgroundColor3=Color3.fromRGB(60,60,76),BorderSizePixel=0,Text="Cancel",TextColor3=Color3.fromRGB(180,180,190),Font=Enum.Font.GothamBold,TextSize=14,ZIndex=22},box).MouseButton1Click:Connect(function() result="cancel" end)
-while result==nil do task.wait(.03) end
-over:Destroy() box:Destroy()
-if type(result)=="table" and result.W then finalDev=result
-else choice=nil
-local kc2=UIS.InputBegan:Connect(function(i2) if i2.KeyCode==Enum.KeyCode.One then choice=DEVICES[1] elseif i2.KeyCode==Enum.KeyCode.Two then choice=DEVICES[2] elseif i2.KeyCode==Enum.KeyCode.Three then choice=DEVICES[3] end end) kc=kc2 end end end
-DEVICE=finalDev
-genv.__IOS18_LASTDEV=type(finalDev.id)=="string" and finalDev.id or "16pro"
+DEVICE=choice
+genv.__IOS18_LASTDEV=choice.id
 game:GetService("TweenService"):Create(bg,TweenInfo.new(.3),{BackgroundTransparency=1}):Play()
 task.wait(.3)
 sg:Destroy() end
@@ -276,11 +213,11 @@ X.tweakOn=function(id)
 return S.jb and S.pkgs[id] and S.live[id] and X.opt("dopTweaks",true) and X.opt("tw_"..id,true)
 end
 X.ccDef={flash=true,lp=true,shazam=true,rec=true,timer=true,calc=true,camera=true,notes=true}
-X.ccNames={{"flash","Flashlight"},{"lp","Low Power Mode"},{"shazam","Music Recognition"},{"rec","Screen Recording"},
-{"timer","Timer"},{"calc","Calculator"},{"camera","Camera"},{"notes","Notes"},{"dark","Dark Mode"},
+X.ccNames={{"timer","Timer"},{"calc","Calculator"},{"camera","Camera"},{"lp","Low Power Mode"},{"flash","Flashlight"},{"shazam","Music Recognition"},{"rec","Screen Recording"},
+{"notes","Notes"},{"silent","Silent Mode"},{"dark","Dark Mode"},
 {"hotspot","Personal Hotspot"},{"vpn","VPN"},{"stopwatch","Stopwatch"},{"alarm","Alarm"},{"voice","Voice Memos"},
 {"wallet","Wallet"},{"settings","Settings"},{"screenshot","Screenshot"},{"magnifier","Magnifier"}}
-S.hidden={} S.touchReq={} S.deleted={} S.wrows={{"calendar","clock"}} S.ccOrder={} S.wsz={}
+S.hidden={} S.touchReq={} S.deleted={} S.wrows={{"stackw"}} S.ccOrder={} S.wsz={}
 X.wunits=function() local u=0 for _,row in ipairs(S.wrows) do local big=false for _,id in ipairs(row) do if S.wsz[id]=="l" then big=true end end u=u+(big and 4 or 2) end return u end
 for _,c in ipairs(X.ccNames) do S.ccOrder[#S.ccOrder+1]=c[1] end
 X.libObjs=setmetatable({},{__mode="k"}) X.libRows=setmetatable({},{__mode="k"}) X.hObjs=setmetatable({},{__mode="k"})
@@ -461,14 +398,7 @@ local batFill=fr(batG,2,2,18,9,WHITE,0,2.5)
 local batNum=new("TextLabel",{Size=UDim2.fromOffset(25,13),BackgroundTransparency=1,Text="87",
 TextSize=9,Font=F_B,TextColor3=BLACK,ZIndex=2},batG)
 reg(fr(batG,26,4.5,1.6,4,WHITE,.55,.5),"BackgroundColor3")
-if DEVICE.cols then
-sb.Size=UDim2.fromOffset(W,DEVICE.sbH)
-sbTime.Size=UDim2.fromOffset(220,22) sbTime.Position=UDim2.fromOffset(22,1) sbTime.TextSize=14 sbTime.TextXAlignment=XL
-pcall(function() wifiG.Position=UDim2.fromOffset(W-88,5) end)
-batG.Position=UDim2.fromOffset(W-50,5)
-vpnL.Position=UDim2.fromOffset(W-140,1)
-sbRec.Position=UDim2.fromOffset(12,0) sbRec.Size=UDim2.fromOffset(170,22)
-elseif DEVICE.sbH<30 then
+if DEVICE.sbH<30 then
 sb.Size=UDim2.fromOffset(W,DEVICE.sbH)
 sbTime.Position=UDim2.fromOffset((W-126)/2,-1) sbTime.TextSize=14
 sigG.Position=UDim2.fromOffset(10,4)
@@ -482,7 +412,7 @@ batG.Position=UDim2.fromOffset(348,18)
 vpnL.Position=UDim2.fromOffset(60,16)
 end
 X.refreshStatus=function()
-sigG.Visible=S.cell and not S.air and not DEVICE.cols wifiG.Visible=S.wifi and not S.air
+sigG.Visible=S.cell and not S.air wifiG.Visible=S.wifi and not S.air
 sbRec.BackgroundColor3=S.rec and RED or BLUE sbRec.BackgroundTransparency=(S.rec or S.hotspot) and 0 or 1
 vpnL.Visible=S.vpn
 batFill.Size=UDim2.fromOffset(math.max(2,18*S.batt/100),9) batNum.Text=tostring(S.batt)
@@ -497,11 +427,11 @@ batFill.BackgroundColor3=fc batNum.TextColor3=(fc==BLACK) and WHITE or BLACK
 if S.rec or S.hotspot then sbTime.TextColor3=WHITE end end
 local function clockStr(d)
 if X.opt("h24",false) then return string.format("%02d:%02d",d.hour,d.min) end
-local h=d.hour%12 if h==0 then h=12 end return string.format("%d:%02d",h,d.min)..(DEVICE.cols and (d.hour<12 and " AM" or " PM") or "") end
+local h=d.hour%12 if h==0 then h=12 end return string.format("%d:%02d",h,d.min) end
 X.clockStr=clockStr
 X.dateTag=function(d) local s=DSHORT[d.wday] return "  "..s:sub(1,1)..s:sub(2):lower().." "..d.day end
 X.clockTick=function()
-local d=os.date("*t") sbTime.Text=clockStr(d)..(X.tweakOn("seconds") and string.format(":%02d",d.sec) or "")..((X.tweakOn("datebar") or DEVICE.cols) and X.dateTag(d) or "") end
+local d=os.date("*t") sbTime.Text=clockStr(d)..(X.tweakOn("seconds") and string.format(":%02d",d.sec) or "")..(X.tweakOn("datebar") and X.dateTag(d) or "") end
 addTicker(function() X.clockTick() end,sb)
 local hb=fr(screen,(W-134)/2,H-13,134,5,WHITE,0,3) hb.ZIndex=22 reg(hb,"BackgroundColor3") X.homeBar=hb
 dimmer=new("Frame",{Size=UDim2.fromOffset(W,H),BackgroundColor3=BLACK,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=30},screen)
@@ -937,9 +867,9 @@ new("UIGradient",{Rotation=45,Color=ColorSequence.new(WHITE,C3(215,255,243))},st
 local d=sc(f,.5,.5,.24,.24,WHITE,.5)
 new("UIGradient",{Rotation=45,Color=ColorSequence.new(WHITE,C3(215,255,243))},d) end
 ICON.sileo=function(f)
-sc(f,.5,.5,.6,.6,WHITE,.5).BackgroundTransparency=.82
-sct(f,"S",.5,.5,.46,.5,WHITE,F_B)
-sc(f,.5,.86,.5,.05,WHITE,.5,0,.4) end
+seg(f,.3,.34,.3,.72,.06,WHITE) seg(f,.3,.72,.58,.86,.06,WHITE) seg(f,.58,.86,.58,.48,.06,WHITE) seg(f,.58,.48,.3,.34,.06,WHITE)
+sc(f,.58,.48,.26,.17,WHITE,0,-28)
+seg(f,.3,.34,.52,.22,.06,WHITE) end
 ICON.discord=function(f)
 local BP=C3(88,101,242)
 sc(f,.5,.54,.74,.46,WHITE,.42)
@@ -962,19 +892,30 @@ sc(f,.5,.52,.76,.36,C3(70,180,255),.14) end
 ICON.health=function(f)
 local c=C3(255,45,85)
 sc(f,.37,.4,.3,.3,c,.5) sc(f,.63,.4,.3,.3,c,.5) sc(f,.5,.56,.33,.33,c,.08,45) end
+ICON.itunes=function(f)
+sc(f,.5,.5,.5,.5,WHITE,.08,0)
+sc(f,.5,.5,.5,.5,WHITE,.08,45) end
 ICON.contacts=function(f)
-sc(f,.5,.36,.28,.28,WHITE,.5) sc(f,.5,.88,.64,.58,WHITE,.5)
-local tc={ORANGE,YELLOW,GREEN,BLUE,C3(175,82,222)}
-for i,c in ipairs(tc) do sc(f,.965,.14+(i-1)*.15,.07,.1,c,.3) end end
+local card=sc(f,.44,.5,.66,.92,C3(238,235,226),.12)
+new("UIStroke",{Color=C3(205,205,210),Thickness=1.5},card)
+sc(f,.42,.4,.22,.22,C3(170,170,178),.5) sc(f,.42,.84,.42,.3,C3(170,170,178),.5)
+local tc={RED,ORANGE,GREEN,BLUE}
+for i,c in ipairs(tc) do sc(f,.98,.22+(i-1)*.2,.045,.14,c,.2) end end
 ICON.stocks=function(f)
 for i=1,3 do sc(f,.5,.3+i*.17,.84,.012,C3(70,70,74),.5) end
 local g=GREEN
 seg(f,.14,.72,.34,.5,.05,g) seg(f,.34,.5,.5,.62,.05,g) seg(f,.5,.62,.86,.22,.05,g)
 sc(f,.86,.22,.09,.09,g,.5) end
 ICON.translate=function(f)
-sc(f,.37,.37,.5,.42,WHITE,.25) sc(f,.24,.6,.12,.12,WHITE,0,45) sct(f,"A",.37,.37,.3,.28,C3(30,110,235),F_B)
-sc(f,.64,.64,.5,.4,C3(205,228,255),.25) sc(f,.78,.86,.12,.12,C3(205,228,255),0,45)
-sct(f,"文",.64,.63,.3,.26,C3(20,80,200),F_B) end
+local gc=C3(50,110,220)
+local ring=sc(f,.5,.5,.76,.76,gc,.5) ring.BackgroundTransparency=1
+new("UIStroke",{Color=gc,Thickness=1.6,Transparency=.3},ring)
+local ring2=sc(f,.5,.5,.46,.76,gc,.5) ring2.BackgroundTransparency=1
+new("UIStroke",{Color=gc,Thickness=1.3,Transparency=.45},ring2)
+seg(f,.13,.5,.87,.5,.012,gc) seg(f,.5,.14,.5,.86,.012,gc)
+sc(f,.33,.34,.46,.4,WHITE,.18) sc(f,.21,.56,.12,.12,WHITE,0,45) sct(f,"A",.33,.33,.26,.24,C3(20,70,190),F_B)
+sc(f,.68,.68,.46,.38,C3(90,200,230),.18) sc(f,.82,.9,.12,.12,C3(90,200,230),0,45)
+sct(f,"文",.68,.67,.26,.22,C3(10,110,140),F_B) end
 ICON.voice=function(f)
 local hs={.14,.3,.5,.34,.22,.44,.2,.12}
 for i,h in ipairs(hs) do sc(f,.12+(i-1)*.108,.38,.048,h,WHITE,.5,0,.1) end
@@ -1000,13 +941,10 @@ new("UIStroke",{Color=r,Thickness=6},o)
 local cover=sc(f,.42,.5,.8-(i-1)*.14,.8-(i-1)*.14,C3(0,0,0),.5)
 cover.BackgroundTransparency=1 end end
 ICON.shortcuts=function(f)
-sc(f,.5,.5,.62,.62,C3(80,90,220),.5)
-sc(f,.5,.5,.42,.42,PURPLE,.5)
-sc(f,.5,.5,.22,.22,C3(140,140,240),.5)
-sc(f,.5,.2,.08,.4,WHITE,.4)
-sc(f,.5,.8,.08,.4,WHITE,.4)
-sc(f,.2,.5,.4,.08,WHITE,.4)
-sc(f,.8,.5,.4,.08,WHITE,.4) end
+local d1=sc(f,.38,.44,.58,.58,C3(240,110,120),.28,45)
+new("UIGradient",{Color=ColorSequence.new(C3(240,110,130),C3(170,100,220)),Rotation=45},d1)
+local d2=sc(f,.62,.56,.58,.58,C3(90,170,230),.28,45)
+new("UIGradient",{Color=ColorSequence.new(C3(90,180,230),C3(70,220,190)),Rotation=45},d2) end
 ICON.home=function(f)
 sc(f,.5,.62,.68,.5,WHITE,.1)
 sc(f,.5,.32,.72,.16,WHITE,.1,0)
@@ -1113,6 +1051,7 @@ def("compass","Compass",C3(60,60,64),C3(20,20,22),ICON.compass,RED)
 def("passwords","Passwords",C3(128,128,138),C3(74,74,84),ICON.passwords,C3(190,190,200))
 def("dopamine","Dopamine",C3(20,200,160),C3(5,171,135),ICON.dopamine,C3(5,171,135),true)
 def("sileo","Sileo",C3(110,235,224),C3(55,220,206),ICON.sileo,C3(55,220,206))
+def("itunes","iTunes Store",C3(230,110,200),C3(130,90,230),ICON.itunes,C3(180,100,215))
 def("podcasts","Podcasts",C3(180,90,240),C3(120,50,200),ICON.podcasts,PURPLE)
 def("fitness","Fitness",C3(28,28,32),C3(10,10,12),ICON.fitness,RED,true)
 def("shortcuts","Shortcuts",C3(90,90,230),C3(60,60,200),ICON.shortcuts,PURPLE)
@@ -1124,7 +1063,7 @@ def("tv","TV",BLACK,BLACK,ICON.tv,WHITE,true)
 def("watch","Watch",BLACK,BLACK,ICON.watch,WHITE,true)
 def("discord","Discord",C3(110,122,255),C3(70,84,238),ICON.discord,C3(88,101,242))
 local PAGE1={"calendar","photos","camera","mail","clock","weather","notes","calculator","wallet","appstore","settings","dopamine"}
-local PAGE2={"reminders","files","health","contacts","stocks","translate","voice","compass","passwords","fitness","shortcuts","discord"}
+local PAGE2={"reminders","files","health","contacts","stocks","translate","voice","compass","passwords","fitness","shortcuts","discord","itunes"}
 local DOCK={"phone","safari","messages","music"}
 local ALL={}
 for _,l in ipairs({DOCK,PAGE1,PAGE2}) do for _,id in ipairs(l) do ALL[#ALL+1]=id end end
@@ -1841,6 +1780,7 @@ h.g({{t="Default",chk=O("iconSize","Default")=="Default",cb=function() S.opt.ico
 "Large icons are bigger and hide app names.")
 styleCard(h.sf,16,h.y,W-32,C3(44,44,48)) h.y=h.y+160
 h.g({tg("Show in App Library","showLib",true),tg("Show Badges","badges",true)},"New Apps") end)
+
 PGS.wall=function(sf)
 local th2,n={},#WALLS
 local ob=new("TextButton",{Position=UDim2.fromOffset(16,20),Size=UDim2.fromOffset(W-32,44),
@@ -1899,11 +1839,16 @@ BackgroundColor3=BLUE,Text="Set",TextColor3=WHITE,Font=F_M,TextSize=15,AutoButto
 b.MouseButton1Click:Connect(function() if not dragged then apply() end end)
 sf.CanvasSize=UDim2.fromOffset(0,H) end
 PGS.face=pg(function(h)
-h.g({tg("iPhone Unlock","fidUnlock",CFG.Passcode==nil),tg("Apple Pay","fidPay",true),
-tg("Password AutoFill","fidFill",true),tg("Face ID with a Mask","fidMask",false)},"Use Face ID For",nil)
+local fid="Face ID"
+h.g({tg("iPhone Unlock","fidUnlock",CFG.Passcode==nil),tg("iTunes & App Store","fidStore",false),tg("Wallet & Apple Pay","fidPay",true),
+tg("Password AutoFill","fidFill",true)},"Use "..fid.." For",fid.." lets you use your face to unlock your device and make purchases.")
 h.g({{t=CFG.Passcode and "Turn Passcode Off" or "Turn Passcode On",red=CFG.Passcode~=nil,
 cb=function() if CFG.Passcode then CFG.Passcode=nil S.passOk=false X.island("Passcode Removed",1.8) h.re()
-else push("Set Passcode",PGS.setpass) end end}},nil,"Without Face ID, a passcode is required to unlock.") end)
+else push("Set Passcode",PGS.setpass) end end},{t="Change Passcode",cb=function() push("Set Passcode",PGS.setpass) end}},nil,"Passcode is required when "..fid.." is set up.")
+h.g({tg("Today View and Search","lockToday",true),tg("Notification Center","lockNC",true),tg("Control Center","lockCC",true),
+tg("Lock Screen Widgets","lockWid",true),tg("Live Activities","lockLive",true),tg("Siri","lockSiri",true),
+tg("Home Control","lockHome",true),tg("Return Missed Calls","lockCalls",true),tg("Workout Health Data","lockHealth",false)},"Allow Access When Locked")
+h.g({tg("Erase Data","eraseData",false)},nil,"Erase all data on this device after 10 failed passcode attempts.") end)
 PGS.sos=pg(function(h)
 h.g({tg("Call with Hold and Release","sosHold",true),tg("Call with 5 Presses","sos5",true),tg("Call Quietly","sosQ",false)})
 h.g({tg("Crash Detection","crash",true),tg("Countdown Sound","sosSound",true)}) end)
@@ -2052,18 +1997,19 @@ sub("Notifications","notif",nil,RED,"notif"),
 sub("Sounds & Haptics","sound",nil,C3(255,45,85),"sound"),
 sub("Focus","focus",function() return S.focus and S.focusName or nil end,PURPLE,"focus"),
 sub("Screen Time","screentime",nil,PURPLE,"time")})
-y=group(sf,y,{
+local grp3={
 sub("General","general",nil,C3(142,142,147),"gear"),
 sub("Accessibility","acc",nil,BLUE,"acc"),
 sub("Camera","camera",nil,C3(142,142,147),"cam"),
 sub("Control Center","ccset",nil,C3(142,142,147),"cc"),
-rdv("Action Button","act",{"Silent Mode","Focus","Camera","Flashlight","Voice Memo","Translate","Magnifier","Controls","Shortcut"},"Silent Mode","Choose an action",nil,C3(50,173,230),"act"),
-sub("StandBy","standby",nil,C3(40,40,44),"stby"),
-sub("Dynamic Island","disl",nil,C3(20,20,24),"stby"),
-sub("Display & Brightness","display",nil,BLUE,"disp"),
-sub("Home Screen & Icons","home",nil,C3(88,86,214),"home"),
-sub("Wallpaper","wall",nil,C3(50,173,230),"wall"),
-sub("Apple Intelligence & Siri","siri",nil,C3(190,90,230),"siri")})
+rdv("Action Button","act",{"Silent Mode","Focus","Camera","Flashlight","Voice Memo","Translate","Magnifier","Controls","Shortcut"},"Silent Mode","Choose an action",nil,C3(50,173,230),"act")}
+table.insert(grp3,sub("StandBy","standby",nil,C3(40,40,44),"stby"))
+table.insert(grp3,sub("Dynamic Island","disl",nil,C3(20,20,24),"stby"))
+table.insert(grp3,sub("Display & Brightness","display",nil,BLUE,"disp"))
+table.insert(grp3,sub("Home Screen & Icons","home",nil,C3(88,86,214),"home"))
+table.insert(grp3,sub("Wallpaper","wall",nil,C3(50,173,230),"wall"))
+table.insert(grp3,sub("Apple Intelligence & Siri","siri",nil,C3(190,90,230),"siri"))
+y=group(sf,y,grp3)
 y=group(sf,y,{
 sub("Face ID & Passcode","face",nil,GREEN,"fid"),
 sub("Emergency SOS","sos",nil,RED,"sos"),
@@ -2922,12 +2868,13 @@ X.CAT={
 {id="fast",name="Speed Demon",author="Zoomer",ver="3.0.2",sec="Animations",col=RED,desc="Speeds up every system animation.",long="Makes all system animations about 40 percent faster."},
 {id="nolabels",name="Label Hider",author="Minimal",ver="1.3.0",sec="Tweaks",col=C3(150,100,255),desc="Hides the names under app icons.",long="Removes app names from the Home Screen for a minimal look."},
 {id="colorful",name="Colorful CC",author="Prism",ver="2.1.0",sec="Control Center",col=PINK,desc="Tints Control Center glyphs with their active color.",long="Each Control Center toggle shows its tint color when active."},
-{id="fiveicondock",name="Five Icon Dock",author="DockPlus",ver="1.0.3",sec="Home Screen",col=BLUE,desc="Allows five apps in the Dock.",long="Fits up to five app icons in the Dock instead of four."},
+{id="maxdock",name="Max Dock",author="DockPlus",ver="2.0.0",sec="Home Screen",col=BLUE,desc="Up to 20 apps in the Dock, icons scale down as more are added.",long="Expands the Dock to hold up to 20 app icons. Icons shrink gradually as you add more."},
 {id="bettersettings",name="BetterSettings",author="UIPro",ver="4.0.1",sec="System",col=C3(100,140,255),desc="Redesigns the Settings app with grouped cards.",long="Refreshes the Settings app with rounded cards and softer colors."},
 }
 for _,p in ipairs({
 {id="ripple",name="TouchRipple",author="Tapper",ver="1.0.0",sec="Animations",col=BLUE,desc="Shows a ripple wherever you touch the screen.",long="TouchRipple draws an expanding ring under every touch."},
 {id="wallcycle",name="WallCycle",author="Rotator",ver="1.1.0",sec="Tweaks",col=TEAL,desc="Changes the wallpaper automatically every 20 seconds.",long="WallCycle cycles through every installed wallpaper on its own."},
+{id="ios27anim",name="iOS27 Animations",author="DepthLab",ver="1.0.0",sec="Animations",col=C3(90,120,255),desc="Animaciones 3D de apps estilo iOS 26/27.",long="Las apps se abren y cierran como tarjetas inclinadas en 3D con rebote elástico, esquinas del tamaño de la pantalla y el Home retrocediendo con profundidad."},
 {id="iconshadow",name="Icon Shadows",author="DepthLab",ver="1.0.1",sec="Tweaks",col=C3(90,90,100),desc="Adds a soft outline to Home Screen icons.",long="Adds a subtle shadow ring around every app icon."},
 {id="bigclock",name="BigClock",author="Timely",ver="1.2.0",sec="Lock Screen",col=ORANGE,desc="Enlarges the Lock Screen clock.",long="Makes the Lock Screen time larger and easier to read."}}) do table.insert(X.CAT,p) end
 X.SOURCES={{"Procursus","apt.procurs.us","Default repository"},{"Dopamine Repo","repo.dopamine.app","Tweaks for Dopamine"},
@@ -3938,6 +3885,35 @@ sf.CanvasSize=UDim2.fromOffset(0,math.ceil(#metrics/2)*140+30) end
 B.contacts=function(cont,app)
 local P=th() cont.BackgroundColor3=P.bg
 tx(cont,"Contacts",20,62,W-40,44,34,P.text,F_B,XL)
+local addB=fr(cont,W-56,64,36,36,BLUE,0,.5)
+ctr(addB,18,18,16,2.4,WHITE,1.2) ctr(addB,18,18,2.4,16,WHITE,1.2)
+local function openAdd()
+local ov=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=BLACK,BackgroundTransparency=.45,BorderSizePixel=0,ZIndex=30},cont)
+local box=fr(ov,16,160,W-32,math.min(H-320,60+#Players:GetPlayers()*56),P.card,0,20) box.ZIndex=31
+tx(box,"Add Contact",16,14,W-64,24,17,P.text,F_B,XL)
+tx(box,"Players in this server",16,42,W-64,16,12,P.sub,F_R,XL)
+local yy=60
+for _,pl in ipairs(Players:GetPlayers()) do
+if pl~=Players.LocalPlayer then
+local already=false for _,c in ipairs(S.contacts) do if c.uid==pl.UserId then already=true end end
+local row=fr(box,12,yy,W-32-24,48,P.sep,0,12) row.ZIndex=31
+U.avatar(row,6,6,36,pl.DisplayName)
+tx(row,pl.DisplayName,50,0,W-32-24-110,48,15,P.text,F_M,XL).ZIndex=32
+local ab=fr(row,W-32-24-72,9,64,30,already and C3(120,120,126) or BLUE,0,.5) ab.ZIndex=32
+tx(ab,already and "Added" or "Add",0,0,64,30,13,WHITE,F_B).ZIndex=33
+if not already then
+tbtn(ab,0,0,64,30,function()
+table.insert(S.contacts,{pl.DisplayName,"Roblox Player",uid=pl.UserId})
+ab.BackgroundColor3=C3(120,120,126)
+for _,o in ipairs(ab:GetChildren()) do if o:IsA("TextLabel") then o.Text="Added" end end
+snd("tap") end)
+end
+yy=yy+56 end end
+local close=fr(box,W-32-44,14,28,28,P.sep,0,.5) close.ZIndex=31
+ctr(close,14,14,10,2,P.text,1.4,45) ctr(close,14,14,10,2,P.text,1.4,-45)
+tbtn(close,0,0,28,28,function() ov:Destroy() B.contacts(cont,app) end)
+end
+tbtn(addB,0,0,36,36,openAdd)
 local srch=fr(cont,16,112,W-32,44,S.dark and C3(44,44,46) or C3(228,228,233),0,14)
 tx(srch,"Search",14,0,W-60,44,17,C3(142,142,147),F_R,XL)
 local sf=U.sfm(cont,0,166,W,H-166)
@@ -3945,13 +3921,18 @@ local sorted={} for _,c in ipairs(S.contacts) do sorted[#sorted+1]=c end
 table.sort(sorted,function(a,b2) return a[1]<b2[1] end)
 local letter=""
 local y=0
+if #sorted==0 then
+tx(sf,"No Contacts",0,40,W,24,17,P.sub,F_M,XL,.5)
+tx(sf,"Tap + to add players from this server.",0,70,W,18,13,P.sub,F_R,XL,.5)
+end
 for _,c in ipairs(sorted) do
 local l=c[1]:sub(1,1):upper()
 if l~=letter then
 tx(sf,l,20,y,W-40,24,15,P.sub,F_B,XL)
 y=y+24 letter=l end
 local r=tbtn(sf,0,y,W,68,function()
-X.island("Calling "..c[1].."…",2.5) snd("tap") end)
+if c.uid then X.openApp("messages") task.defer(function() if Add.openChat then Add.openChat(c.uid) end end)
+else X.island("Calling "..c[1].."…",2.5) end snd("tap") end)
 U.avatar(r,20,10,48,c[1])
 tx(r,c[1],82,10,W-140,26,17,P.text,F_M,XL)
 tx(r,c[2],82,38,W-160,18,13,P.sub,F_R,XL)
@@ -4282,12 +4263,13 @@ local pages=new("CanvasGroup",{Size=UDim2.fromOffset(W*3,H),BackgroundTransparen
 local pg={}
 for i=1,3 do pg[i]=new("Frame",{Position=UDim2.fromOffset((i-1)*W,0),Size=UDim2.fromOffset(W,H),BackgroundTransparency=1},pages) end
 local widF=new("Frame",{Size=UDim2.fromOffset(W,260),BackgroundTransparency=1},pg[1])
-local function cellX(c) if DEVICE.cols then return (W-(5*150+60))/2+c*150 end return 29+c*90 end
-local function cellY(r) return 66+r*98 end
+local function cellX(c) return 29+c*90 end
+local RT,RP=66,98 if DEVICE.id=="8plus" then RT,RP=38,86 end
+local function cellY(r) return RT+r*RP end
 S.home={{table.unpack(PAGE1)},{table.unpack(PAGE2)}}
 X.startRow=function(p) if p==1 then return X.wunits() end return 0 end
-X.cap=function(p) return (DEVICE.rows-X.startRow(p))*(DEVICE.cols or 4) end
-X.dockMax=function() return X.tweakOn("floatingdock") and 8 or (X.tweakOn("fiveicondock") and 5 or 4) end
+X.cap=function(p) return (DEVICE.rows-X.startRow(p))*4 end
+X.dockMax=function() return X.tweakOn("floatingdock") and 8 or (X.tweakOn("maxdock") and 20 or 4) end
 X.libFilter=function(ids) local o={} for _,id in ipairs(ids) do if APP[id] and not S.deleted[id] and not S.hidden[id] then o[#o+1]=id end end return o end
 X.normalize=function()
 local seen={}
@@ -4319,7 +4301,7 @@ elseif type(it)=="table" then for j=#it.ids,1,-1 do if it.ids[j]==id then table.
 for i=#DOCK,1,-1 do if DOCK[i]==id then table.remove(DOCK,i) end end
 for i=#S.recents,1,-1 do if S.recents[i]==id then table.remove(S.recents,i) end end end
 X.resetHome=function()
-S.deleted={} S.hidden={} S.touchReq={} S.wrows={{"calendar","clock"}} S.wsz={}
+S.deleted={} S.hidden={} S.touchReq={} S.wrows={{"stackw"}} S.wsz={}
 S.home={{table.unpack(PAGE1)},{table.unpack(PAGE2)}}
 for i=#DOCK,1,-1 do table.remove(DOCK,i) end
 for _,id in ipairs({"phone","safari","messages","music"}) do DOCK[#DOCK+1]=id end
@@ -4328,7 +4310,8 @@ X.buildDock() X.buildHome() X.rebuildWidgets() end
 X.refreshEdit=function() pcall(function() X.buildDock() X.buildHome() X.rebuildWidgets() end) end
 local dockF=new("CanvasGroup",{Size=UDim2.fromOffset(W,H),BackgroundTransparency=1},homeL)
 X.dockF=dockF
-X.dockFrost=frost(dockF,DEVICE.cols and (W-560)/2 or 12,733+DOFF,DEVICE.cols and 560 or 366,95,36,C3(236,236,243),.12)
+if DEVICE.id=="8plus" then X.dockFrost=frost(dockF,0,583,W,H-583,0,C3(236,236,243),.12)
+else X.dockFrost=frost(dockF,12,733+DOFF,366,95,36,C3(236,236,243),.12) end
 X.buildDock=function()
 for key,r in pairs(iconRefs) do
 if r[9] then r[1]:Destroy() if r[11] then r[11]:Destroy() end iconRefs[key]=nil end end
@@ -4340,12 +4323,10 @@ if S.edit then iconRefs[id][11]=X.mkBadge(dockF,function() X.removeMenu(id) end)
 if X.layoutIcons then X.layoutIcons(true) end end
 X.buildDock()
 X.slotPos=function(col,row,dock)
-if DEVICE.cols then if dock then local n=#DOCK local st=math.min(96,520/n) return (W-(n*st-(st-60)))/2+col*st,750+DOFF,60 end return cellX(col),cellY(row),60 end
-if dock and #DOCK>=6 then local n=#DOCK local pt=354/n local s0=math.min(60,pt-6) return 6+col*pt+(pt-s0)/2,750+DOFF+(60-s0)/2,s0 end
-if dock and #DOCK>=5 then return 21+col*72,750+DOFF,60 end
+if dock then local n=math.max(#DOCK,1) local s0=math.max(32,math.min(60,math.floor(354/n)-4)) local gap=(366-n*s0)/(n+1) local ox=gap+col*(s0+gap) return ox,750+DOFF+(60-s0)/2,s0 end
 local big=X.opt("iconSize","Default")=="Large"
 local sz=big and (dock and 70 or 74) or 60
-if big then return 20+col*92+(dock and 2 or 0),dock and 747+DOFF or (66+row*97),sz end
+if big then return 20+col*92+(dock and 2 or 0),dock and 747+DOFF or (RT+row*(RP-1)),sz end
 return cellX(col),dock and 750+DOFF or cellY(row),sz end
 X.layoutIcons=function(instant)
 local big=X.opt("iconSize","Default")=="Large"
@@ -4383,7 +4364,7 @@ for page=1,2 do
 local startRow=X.startRow(page)
 for idx,item in ipairs(S.home[page]) do
 local i=idx-1
-local nc=DEVICE.cols or 4 local row,col=startRow+math.floor(i/nc),i%nc
+local row,col=startRow+math.floor(i/4),i%4
 local b,lb,key
 if type(item)=="string" then
 key=item b=mkIcon(pg[page],APP[item],60,0,0) lb=tx(pg[page],APP[item].name,0,0,90,16,12,WHITE,F_M)
@@ -4429,12 +4410,13 @@ local oList,oIdx,oDock
 for p=1,2 do for i,it in ipairs(S.home[p]) do if it==item then oList,oIdx=S.home[p],i end end end
 if not oList then for i,id in ipairs(DOCK) do if id==item then oList,oIdx,oDock=DOCK,i,true end end end
 if not oList then X.buildDock() X.buildHome() return end
+if st.clone then st.clone:Destroy() st.clone=nil end
 local function slotIdx(n,pg2,dock)
 local best,bd=1,1e9
 local sr=X.startRow(pg2)
 for i=1,n do
 local px,py,sz
-if dock then px,py,sz=X.slotPos(i-1,0,true) else px,py,sz=X.slotPos((i-1)%(DEVICE.cols or 4),sr+math.floor((i-1)/(DEVICE.cols or 4))) end
+if dock then px,py,sz=X.slotPos(i-1,0,true) else px,py,sz=X.slotPos((i-1)%4,sr+math.floor((i-1)/4)) end
 local d=(x-px-sz/2)^2+(y-py-sz/2)^2
 if d<bd then bd=d best=i end end
 return best end
@@ -4442,8 +4424,10 @@ if y>715+DOFF and type(item)=="string" then
 if oDock then
 local it=table.remove(DOCK,oIdx)
 table.insert(DOCK,math.min(slotIdx(#DOCK+1,1,true),#DOCK+1),it)
+if st.clone then st.clone:Destroy() st.clone=nil end
 elseif #DOCK<X.dockMax() then
 table.remove(oList,oIdx)
+if st.clone then st.clone:Destroy() st.clone=nil end
 table.insert(DOCK,math.min(slotIdx(#DOCK+1,1,true),#DOCK+1),item) snd("tap")
 else X.island("Dock is Full",1.5) end
 else
@@ -4472,6 +4456,7 @@ else
 table.remove(oList,oIdx)
 local pos=math.min(slotIdx(#list+1,pgN,false),#list+1)
 table.insert(list,pos,item) end end end
+if st.ref and st.ref[1] and st.ref[1].Parent==dragL then st.ref[1]:Destroy() end
 X.buildDock() X.buildHome() end
 local folderL=new("CanvasGroup",{Size=UDim2.fromOffset(W,H),BackgroundTransparency=1,ZIndex=9,Visible=false},homeL)
 X.folderOpen=nil
@@ -4534,6 +4519,19 @@ X.closeFolder() X.buildHome() end)
 ctr(mb,13,13,22,22,RED,11) ctr(mb,13,13,12,2.4,WHITE,1) end end end
 local dots={}
 for i=1,2 do dots[i]=fr(homeL,CX-10.5+(i-1)*14,708+DOFF,7,7,WHITE,i==1 and 0 or .55,.5) end
+local pgSrch=tx(homeL,"Search",0,708+DOFF-6,W,18,13,C3(210,210,215),F_M,2)
+pgSrch.TextTransparency=1
+local pgHit=new("TextButton",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromOffset(CX,712+DOFF),Size=UDim2.fromOffset(120,28),BackgroundTransparency=1,Text="",AutoButtonColor=false},homeL)
+pgHit.MouseButton1Click:Connect(function() if S.page<3 and X.openSpot then X.openSpot() end end)
+local pgTok=0
+local function pgIdle()
+pgTok=pgTok+1 local tok=pgTok
+for _,d in ipairs(dots) do d.Visible=S.page<3 end
+tw(pgSrch,.2,{TextTransparency=1})
+task.delay(1,function() if tok==pgTok and S.page<3 and not S.edit then
+for _,d in ipairs(dots) do tw(d,.3,{BackgroundTransparency=1}) end
+tw(pgSrch,.3,{TextTransparency=.35}) end end) end
+X.pgIdle=pgIdle
 X.revealPrep=function()
 pages.Visible=false X.dockF.Visible=false
 for _,d in ipairs(dots) do d.Visible=false end end
@@ -4595,14 +4593,7 @@ w[1].Position=UDim2.fromOffset(OX+s0*dx,OY+s0*dy) w[4].Scale=s0
 task.delay(dn*T*.3,function()
 if w[1].Parent then tw(w[1],T*.62,{Position=UDim2.fromOffset(w[2],w[3])},EZ.Back) tw(w[4],T*.62,{Scale=1},EZ.Back) end end) end
 X.stopSp(X.dockF) X.dockF.Position=UDim2.fromOffset(0,160) X.dockF.GroupTransparency=1
-task.delay(T*.34,function() tw(X.dockF,T*.6,{Position=UDim2.fromOffset(0,0)},EZ.Back) tw(X.dockF,T*.4,{GroupTransparency=0}) end)
-local ring=new("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromOffset(OX,OY),Size=UDim2.fromOffset(30,30),
-BackgroundTransparency=1,BorderSizePixel=0,ZIndex=20},homeL)
-cor(ring,.5)
-local rk=new("UIStroke",{Color=WHITE,Thickness=2.5,Transparency=.55},ring)
-X.twn(ring,T*.8,{Size=UDim2.fromOffset(W*2.2,W*2.2)},EZ.Quad,ED.Out)
-X.twn(rk,T*.8,{Transparency=1},EZ.Quad,ED.In)
-task.delay(T*.85,function() ring:Destroy() end) end
+task.delay(T*.34,function() tw(X.dockF,T*.6,{Position=UDim2.fromOffset(0,0)},EZ.Back) tw(X.dockF,T*.4,{GroupTransparency=0}) end) end
 X.reveal18=function(T)
 pages.Visible=true
 X.dockF.Visible=(S.page~=3)
@@ -4649,6 +4640,7 @@ local function setPage(n,instant)
 S.page=n local p=UDim2.fromOffset(-(n-1)*W,0)
 if instant then pages.Position=p else tw(pages,.45,{Position=p}) end
 for i,d in ipairs(dots) do d.Visible=n<3 tw(d,.25,{BackgroundTransparency=(i==n) and 0 or .55}) end
+pgIdle()
 X.stopSp(X.dockF)
 if n==3 then
 if instant then X.dockF.GroupTransparency=1 X.dockF.Visible=false
@@ -4729,14 +4721,14 @@ tbtn(w,202,102,60,40,function() X.musStep(1) X.rebuildWidgets() end) end}}
 X.WBY={} for _,d in ipairs(X.WCAT) do X.WBY[d.id]=d end
 X.rebuildWidgets=function()
 widF:ClearAllChildren()
-widF.Size=UDim2.fromOffset(W,math.max(20,66+98*X.wunits()))
+widF.Size=UDim2.fromOffset(W,math.max(20,RT+RP*X.wunits()))
 local P=th()
 X.wids={}
-local top=66
+local top=RT
 for r,row in ipairs(S.wrows) do
 local first=X.WBY[row[1]]
 local sz1=S.wsz[row[1]] or (first and first.size) or "s"
-local hgt=(sz1=="l") and 354 or 158
+local hgt=(sz1=="l") and (RP==98 and 354 or 330) or 158
 local cy=top+hgt/2
 local dx=cellX(0)-29 local slots=(sz1=="s") and {{106+dx,158},{284+dx,158}} or {{195+dx,322}}
 for c,id in ipairs(row) do
@@ -4848,12 +4840,17 @@ for _,id in ipairs({"calculator","clock","photos","calendar"}) do
 local dup=false for _,v in ipairs(ids) do if v==id then dup=true end end
 if not dup and #ids<4 then ids[#ids+1]=id end end end
 ids=X.libFilter(ids)
-local x,y=20+((ci-1)%2)*185,6+math.floor((ci-1)/2)*190
-local g=fr(lib,x,y,165,165,C3(238,238,244),.06,30)
-for k=1,3 do if ids[k] then slot(g,ids[k],12+((k-1)%2)*75,12+math.floor((k-1)/2)*75,66) end end
-if #ids==4 then slot(g,ids[4],87,87,66)
-else for k=0,3 do if ids[4+k] then slot(g,ids[4+k],87+(k%2)*34,87+math.floor(k/2)*34,31) end end end
-tx(lib,c[1],x,y+168,165,16,13,WHITE,F_M) end
+local cols=2
+local cardW=165
+local cardH=cardW
+local x,y=20+((ci-1)%cols)*(cardW+16),6+math.floor((ci-1)/cols)*(cardH+32)
+local g=fr(lib,x,y,cardW,cardH,C3(238,238,244),.06,30)
+local isz=66
+local sp=12
+for k=1,3 do if ids[k] then slot(g,ids[k],sp+((k-1)%2)*(isz+sp),sp+math.floor((k-1)/2)*(isz+sp),isz) end end
+if #ids==4 then slot(g,ids[4],sp+(isz+sp),sp+(isz+sp),isz)
+else for k=0,3 do if ids[4+k] then local ms=math.floor(isz*.47) slot(g,ids[4+k],sp+(isz+sp)+(k%2)*ms,sp+(isz+sp)+math.floor(k/2)*ms,ms) end end end
+tx(lib,c[1],x,y+cardH+4,cardW,16,13,WHITE,F_M) end
 pcall(X.libHidden,lib,#cats+1) end
 local f
 local function buildList(q)
@@ -4955,6 +4952,21 @@ local CCOL={WHITE,C3(255,218,73),C3(109,204,255),C3(255,140,175),C3(140,235,160)
 local lkDate=tx(lockIn,"",0,90,W,28,21,WHITE,F_M)
 local lkTime=tx(lockIn,"",0,114,W,110,92,WHITE,F_B) lkTime.TextTransparency=.08
 X.lkTime=lkTime X.lkDate=lkDate
+local function clockReposition() local cy=S.lock.clockY or 0 lkDate.Position=UDim2.fromOffset(0,90+cy) lkTime.Position=UDim2.fromOffset(0,114+cy) end
+clockReposition()
+local clockGrab=new("Frame",{Position=UDim2.fromOffset(0,70),Size=UDim2.fromOffset(W,160),BackgroundTransparency=1,ZIndex=29,Active=false},lockIn)
+local cgStroke=new("UIStroke",{Color=WHITE,Thickness=1.5,Transparency=1},clockGrab) cor(clockGrab,18)
+local cgDragging=false local cgStartY,cgBaseY
+clockGrab.InputBegan:Connect(function(i) if not S.lockEditing then return end
+if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+cgDragging=true snd("tap") local m=UIS:GetMouseLocation() cgStartY=m.Y cgBaseY=S.lock.clockY or 0 end end)
+clockGrab.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then cgDragging=false end end)
+conn(UIS.InputChanged,function(i)
+if not cgDragging then return end
+if i.UserInputType~=Enum.UserInputType.MouseMovement and i.UserInputType~=Enum.UserInputType.Touch then return end
+local m=UIS:GetMouseLocation()
+local dy=(m.Y-cgStartY)/dscale.Scale
+S.lock.clockY=math.clamp(cgBaseY+dy,-70,130) clockReposition() end)
 X.fgHolder=new("Frame",{Name="fgHolder",Size=UDim2.fromScale(1,1),BackgroundTransparency=1,ZIndex=2,Active=false},lockIn)
 ctr(lockIn,CX,70,14,11,WHITE,2.5)
 local shk=new("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromOffset(CX,60),
@@ -5103,16 +5115,13 @@ S.authed=true X.doUnlock() if after then after() end return end
 S.fid=true
 X.faceID(function() S.fid=false S.authed=true X.haptic() X.doUnlock() if after then after() end end) end
 X.lockDrag=function(d)
-if S.ncOpen then X.stopSp(lockL) lockL.Position=UDim2.new(.5,0,.5,d) return end
-X.stopSp(lockIn) lockIn.Position=UDim2.new(.5,0,.5,d)
-local t=math.clamp(-d/90,0,1)
-lkTime.TextTransparency=.08+.92*t lkDate.TextTransparency=t
-X.dragBlend(math.clamp(-d/(H*.45),0,1)) end
+X.stopSp(lockL) lockL.Position=UDim2.new(.5,0,.5,d)
+X.dragBlend(0) end
 X.dragBlend=function(p)
 X.hveil.BackgroundColor3=S.dark and BLACK or C3(235,235,242)
-X.hveil.BackgroundTransparency=1-.38*(1-p)
-X.wallLock.GroupTransparency=p*.88
-homeS.Scale=1+.1*(1-p) end
+X.hveil.BackgroundTransparency=1
+X.wallLock.GroupTransparency=0
+homeS.Scale=1 end
 X.lockSettle=function()
 tw(X.wallLock,.35,{GroupTransparency=0}) tw(homeS,.35,{Scale=1}) tw(X.hveil,.35,{BackgroundTransparency=1})
 X.stopSp(lockL) tw(lockL,.45,{Position=UDim2.fromScale(.5,.5)})
@@ -5141,8 +5150,7 @@ X.homeFx(0,0,0,0) homeS.Scale=1
 X.revealPrep()
 X.unlockPrep(T)
 tw(lkTime,.16,{TextTransparency=1}) tw(lkDate,.16,{TextTransparency=1})
-X.twn(lockIn,.36,{Position=UDim2.new(.5,0,.5,-170)},EZ.Quad,ED.Out)
-X.twn(lockL,.34,{GroupTransparency=1},EZ.Linear,ED.Out)
+X.twn(lockL,.34,{Position=UDim2.new(.5,0,.5,-H)},EZ.Quint,ED.In)
 task.delay(.1,function() X.reveal(T) end)
 X.applyTint()
 task.delay(.44,function() X.lockRestore() lockL.Visible=false end)
@@ -5150,12 +5158,7 @@ task.delay(T,function() S.busy=false X.finishReveal() end)
 return end
 X.homeFx(0,0,0,0) homeS.Scale=1
 X.revealPrep()
-tw(lkTime,.16,{TextTransparency=1}) tw(lkDate,.16,{TextTransparency=1})
-for _,n in ipairs(nots) do tw(n.g,.2,{GroupTransparency=1}) end
-if lm then tw(lm,.2,{GroupTransparency=1}) end
-tw(bw,.2,{GroupTransparency=1}) tw(fpill,.2,{GroupTransparency=1})
-X.twn(lockIn,X.tweakOn("unlock26") and .4 or T*.55,{Position=UDim2.new(.5,0,.5,-H*1.08)},EZ.Quint,ED.In)
-X.twn(X.wallLock,.2,{GroupTransparency=1},EZ.Linear,ED.Out)
+X.twn(lockL,.42,{Position=UDim2.new(.5,0,.5,-H)},EZ.Quint,ED.In)
 task.delay(T*.2,function() X.reveal(T) end)
 X.applyTint()
 task.delay(T*.46,function() X.lockRestore() lockL.Visible=false end)
@@ -5201,6 +5204,7 @@ on=on and true or false
 if on==(S.lockEditing or false) then return end
 S.lockEditing=on
 if on then
+clockGrab.Active=true tw(cgStroke,.25,{Transparency=.55})
 snd("tap") X.haptic()
 X.lockSnap={} for k,v in pairs(S.lock) do X.lockSnap[k]=v end
 snap={S.wall,S.img,S.blur,S.lock.font,S.lock.color,S.lock.widget}
@@ -5218,7 +5222,7 @@ local cn=frost(leF,16,58,86,38,19,C3(60,60,66),.4) tx(cn,"Cancel",0,0,86,38,16,W
 tbtn(cn,0,0,86,38,function()
 S.wall,S.img,S.blur,S.lock.font,S.lock.color,S.lock.widget=snap[1],snap[2],snap[3],snap[4],snap[5],snap[6]
 for k in pairs(S.lock) do S.lock[k]=nil end for k,v in pairs(X.lockSnap or {}) do S.lock[k]=v end
-X.applyWalls() X.applyLockStyle() X.lockEdit(false) end)
+X.applyWalls() X.applyLockStyle() clockReposition() X.lockEdit(false) end)
 local dn=frost(leF,W-102,58,86,38,19,BLUE,.15) tx(dn,"Done",0,0,86,38,16,WHITE,F_B)
 tbtn(dn,0,0,86,38,function() X.lockEdit(false) end)
 local sh=frost(leF,12,H-304,W-24,292,30,C3(38,38,42),.3)
@@ -5242,6 +5246,7 @@ on3=not on3 S.lock.widget=on3
 tw(tr,.25,{BackgroundColor3=on3 and GREEN or C3(90,90,96)})
 tw(kn,.3,{Position=UDim2.fromOffset(on3 and 22 or 2,2)},EZ.Back) end)
 else
+clockGrab.Active=false tw(cgStroke,.25,{Transparency=1})
 tw(lockS,.55,{Scale=1}) tw(lockIn,.55,{Position=UDim2.fromScale(.5,.5)})
 tw(X.wls,.55,{Scale=1}) tw(X.wallLock,.55,{Position=UDim2.fromScale(.5,.5)})
 local l=leF tw(l,.45,{Position=UDim2.fromOffset(0,H)})
@@ -5286,20 +5291,51 @@ local pw=fr(tl,W-58,40,36,36,TILE,.2,.5)
 local po=ctr(pw,18,20,16,16,TILE,.5) po.BackgroundTransparency=1
 new("UIStroke",{Color=WHITE,Thickness=2},po) ctr(pw,18,11,2.4,9,WHITE,1.2)
 tbtn(pw,0,0,36,36,function() X.closeCC() task.delay(.3,X.power) end)
+local SH=(DEVICE.id=="8plus") and 0 or 28
+local hdrSet={} for _,c in ipairs(tl:GetChildren()) do hdrSet[c]=true end
+if SH>0 then
+for i=0,3 do local h=5+i*3 ctr(tl,22+i*5,92-h/2,3.4,h,WHITE,1) end
+tx(tl,"Carrier",44,82,120,18,14,WHITE,F_M,XL)
+tx(tl,string.format("%d%%",math.floor(S.batt or 100)),W-134,82,106,18,14,WHITE,F_M,XR)
+for _,o in ipairs(tl:GetChildren()) do if not hdrSet[o] then hdrSet[o]=true end end
+for k,ic in ipairs({"heart","music","radio"}) do
+local cy=420+(k-1)*42
+if ic=="heart" then ctr(tl,W-9,cy,10,9,WHITE,3) ctr(tl,W-9,cy+4,5,5,WHITE,1,45)
+elseif ic=="music" then ctr(tl,W-11,cy+3,5,4,WHITE,2) ctr(tl,W-8,cy-2,1.6,11,WHITE,.8) ctr(tl,W-6,cy-6,5,2,WHITE,1)
+else ctr(tl,W-9,cy+3,2,9,WHITE,1) local o=ctr(tl,W-9,cy-2,11,11,TILE,5.5) o.BackgroundTransparency=1 new("UIStroke",{Color=WHITE,Thickness=1.4},o) end
+end
+end
 local con=tile(14,100,174,174)
+local ad=S.airdrop~=false
 local function circ(x,y,on,col,glyph,cb)
 local b=fr(con,x,y,74,74,on and col or TILE,on and 0 or .2,.5)
 glyph(b) ccCol(b,col,on) tap(b,74,74,cb) end
+local function mini(x,y,on,col,glyph,cb)
+local b=fr(con,x,y,34,34,on and col or TILE,on and 0 or .2,.5)
+local hl=new("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromOffset(17,17),Size=UDim2.fromOffset(74,74),BackgroundTransparency=1},b)
+new("UIScale",{Scale=.46},hl) glyph(hl) tap(b,34,34,cb) end
 circ(9,9,S.air,ORANGE,function(b)
 ctr(b,37,37,5,34,WHITE,2.5,45) ctr(b,35,39,26,5,WHITE,2.5,45) ctr(b,27,48,12,4,WHITE,2,45) end,
 function() S.air=not S.air X.refreshStatus() end)
-circ(91,9,S.cell,GREEN,function(b)
+circ(91,9,ad,BLUE,function(b)
+ctr(b,37,40,8,8,WHITE,4)
+for _,rad in ipairs({24,40}) do local o=ctr(b,37,40,rad,rad,TILE,rad/2) o.BackgroundTransparency=1 new("UIStroke",{Color=WHITE,Thickness=2.4},o) end end,
+function() S.airdrop=not ad end)
+circ(9,91,S.wifi,BLUE,function(b) wifiGlyph(b,21,25,2,WHITE) end,function() S.wifi=not S.wifi X.refreshStatus() end)
+mini(91,91,S.cell,GREEN,function(b)
 for i=0,3 do local h=10+i*7 ctr(b,21+i*10,52-h/2,6,h,WHITE,2) end end,
 function() S.cell=not S.cell X.refreshStatus() end)
-circ(9,91,S.wifi,BLUE,function(b) wifiGlyph(b,21,25,2,WHITE) end,function() S.wifi=not S.wifi X.refreshStatus() end)
-circ(91,91,S.bt,BLUE,function(b)
+mini(131,91,S.bt,BLUE,function(b)
 ctr(b,37,37,3,40,WHITE,1.5) ctr(b,42,22,3,14,WHITE,1.5,-45) ctr(b,42,52,3,14,WHITE,1.5,45)
 ctr(b,37,37,3,29,WHITE,1.5,45) ctr(b,37,37,3,29,WHITE,1.5,-45) end,function() S.bt=not S.bt end)
+mini(91,131,S.hotspot,GREEN,function(b)
+ctr(b,37,44,8,8,WHITE,4)
+for _,rad in ipairs({26,44}) do local o=ctr(b,37,44,rad,rad,TILE,rad/2) o.BackgroundTransparency=1 new("UIStroke",{Color=WHITE,Thickness=3},o) end end,
+function() S.hotspot=not S.hotspot X.refreshStatus() X.applyTint() end)
+mini(131,131,S.vpn,BLUE,function(b)
+local o=ctr(b,37,37,46,46,TILE,23) o.BackgroundTransparency=1 new("UIStroke",{Color=WHITE,Thickness=3},o)
+ctr(b,37,37,3,46,WHITE,1.5) ctr(b,37,37,46,3,WHITE,1.5) end,
+function() S.vpn=not S.vpn X.refreshStatus() end)
 local md=tile(202,100,174,174)
 local m=S.mus local tr=TRACKS[m.i]
 local art=fr(md,14,14,60,60,C3(90,90,98),0,12)
@@ -5327,10 +5363,10 @@ local oo=ctr(ori,40,40,24,32,TILE,6) oo.BackgroundTransparency=1
 new("UIStroke",{Color=oc,Thickness=2.5},oo) ctr(ori,40,43,12,10,oc,2)
 tap(ori,80,80,function()
 X.closeCC() task.delay(.35,function() X.setLand(not X.land) end) end)
-local sil=tile(108,288,80,80,S.silent,RED,.5) bellG(sil,40,38,WHITE,S.silent)
-tap(sil,80,80,function() S.silent=not S.silent
-X.island(S.silent and "Silent Mode On" or "Silent Mode Off",1.8,
-function(g) bellG(g,16,15,S.silent and RED or WHITE,S.silent) end) end)
+local sil=tile(108,288,80,80,false,WHITE,.5)
+do local a=ctr(sil,36,36,26,20,TILE,4) a.BackgroundTransparency=1 new("UIStroke",{Color=WHITE,Thickness=2.5},a)
+local b2=ctr(sil,44,44,26,20,TILE,4) b2.BackgroundTransparency=1 new("UIStroke",{Color=WHITE,Thickness=2.5},b2) end
+tap(sil,80,80,function() X.island("Screen Mirroring",1.8) end)
 local FC=PURPLE
 local fo=tile(14,382,174,80,S.focus,FC)
 ctr(fo,38,40,26,26,WHITE,13) ctr(fo,46,34,24,24,S.focus and FC or C3(96,96,104),12)
@@ -5425,6 +5461,8 @@ function() X.openApp("settings") end},
 {"screenshot",function() return false end,WHITE,function(f,c)
 local o=ctr(f,40,40,32,32,TILE,6) o.BackgroundTransparency=1 new("UIStroke",{Color=c,Thickness=2.5},o) ctr(f,40,40,14,14,c,3) end,
 function() X.closeCC() task.delay(.35,function() if X.flashScreen then X.flashScreen() end X.island("Screenshot Saved",1.8) end) end},
+{"silent",function() return S.silent end,RED,function(f,c) bellG(f,40,38,c,S.silent) end,
+function() S.silent=not S.silent X.island(S.silent and "Silent Mode On" or "Silent Mode Off",1.8,function(g) bellG(g,16,15,S.silent and RED or WHITE,S.silent) end) end},
 {"magnifier",function() return false end,WHITE,function(f,c)
 local o=ctr(f,36,36,26,26,TILE,13) o.BackgroundTransparency=1 new("UIStroke",{Color=c,Thickness=3},o) ctr(f,52,52,4,16,c,1.2,-45) end,
 function() X.island("Magnifier",1.6) end}}
@@ -5440,23 +5478,25 @@ local ad=tile(14+(idx%4)*94,476+math.floor(idx/4)*94,80,80,false,WHITE,.5)
 tx(ad,"+",0,-2,80,80,34,WHITE,F_R)
 tbtn(ad,0,0,80,80,function() S.ccSheet=true build(false) end) end
 if S.ccEdit then tx(tl,"Tap a control to move it forward",0,H-70,W,20,13,C3(220,220,230),F_R) end
+if SH>0 then for _,o in ipairs(tl:GetChildren()) do if o:IsA("GuiObject") and not hdrSet[o] then o.Position=o.Position+UDim2.fromOffset(0,SH) end end end
 if S.ccSheet then
-local sh=fr(tl,10,110,W-20,H-140,C3(30,30,34),.05,30) sh.Active=true
-tx(sh,"Add a Control",0,16,W-20,26,19,WHITE,F_B)
-local cl=fr(sh,W-20-66,14,52,28,C3(80,80,88),0,.5) tx(cl,"Done",0,0,52,28,13,WHITE,F_M)
+local CW=W-20
+local sh=fr(tl,10,110,CW,H-140,C3(30,30,34),.05,30) sh.Active=true
+tx(sh,"Add a Control",0,16,CW,26,19,WHITE,F_B)
+local cl=fr(sh,CW-66,14,52,28,C3(80,80,88),0,.5) tx(cl,"Done",0,0,52,28,13,WHITE,F_M)
 tbtn(cl,0,0,52,28,function() S.ccSheet=false build(false) end)
-local sf=new("ScrollingFrame",{Position=UDim2.fromOffset(0,56),Size=UDim2.fromOffset(W-20,H-140-64),
+local sf=new("ScrollingFrame",{Position=UDim2.fromOffset(0,56),Size=UDim2.fromOffset(CW,H-140-64),
 BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=0,CanvasSize=UDim2.fromOffset(0,0),
 AutomaticCanvasSize=Enum.AutomaticSize.Y},sh)
 local ry=0
 for _,nm in ipairs(X.ccNames) do
 local id=nm[1]
 if byId[id] and not X.ccActive(id) then
-local row=fr(sf,14,ry,W-48,64,C3(70,70,78),.4,16)
+local row=fr(sf,14,ry,CW-28,64,C3(70,70,78),.4,16)
 local pv=fr(row,8,8,80,80,TILE,.2,.5) new("UIScale",{Scale=.6},pv)
 byId[id][4](pv,WHITE)
 tx(row,nm[2],70,0,170,64,16,WHITE,F_M,XL)
-local ab=fr(row,W-48-48,18,32,28,BLUE,0,.5) tx(ab,"+",0,-1,32,28,20,WHITE,F_B)
+local ab=fr(row,CW-28-48,18,32,28,BLUE,0,.5) tx(ab,"+",0,-1,32,28,20,WHITE,F_B)
 tbtn(row,0,0,W-48,64,function()
 if idx>=12 then X.island("Control Center is Full",1.6) return end
 X.ccAdd(id) S.ccSheet=false build(false) end)
@@ -5528,12 +5568,13 @@ new("UIStroke",{Color=ink,Thickness=2},ringO)
 ctr(pill,37,33,8,2.4,ink,1,45)
 ctr(pill,W-32-28,20,8,14,ink,4) ctr(pill,W-32-28,31,14,2,ink,1)
 local f local first
-local rows
+local rows local bub
 local function pickRow(r)
 X.spotRecord(f.text) X.closeSpot()
 if r.id then task.delay(.1,function() X.openApp(r.id) end) elseif r.fn then task.delay(.1,r.fn) end end
 local function render()
 if rg then rg:Destroy() rg=nil end
+if bub then bub:Destroy() bub=nil end
 local q=f.text:lower()
 if q=="" then sec.Visible=true first=nil rows=nil return end
 sec.Visible=false
@@ -5542,15 +5583,55 @@ if X.spotRows then local ok,ex=pcall(X.spotRows,f.text) if ok then for _,r in ip
 for _,id in ipairs(ALL) do if APP[id].name:lower():find(q,1,true) and not S.hidden[id] then rows[#rows+1]={id=id,title=APP[id].name,sub="Application"} end end
 first=rows[1]
 if #rows==0 then return end
-for k=#rows,7,-1 do rows[k]=nil end
-local hh=#rows*60
-rg=frost(sg,16,math.max(70,pillY-14-hh),W-32,hh,22,dk and C3(44,44,50) or WHITE,dk and .25 or .1)
-for i,r in ipairs(rows) do
-local row=tbtn(rg,0,(i-1)*60,W-32,60,function() pickRow(r) end)
-if r.id then mkIcon(row,APP[r.id],40,12,10).Active=false
-else local c=ctr(row,32,30,40,40,C3(120,130,160),20) tx(c,string.sub(r.sub or "?",1,1),0,0,40,40,16,WHITE,F_B) end
-tx(row,r.title,66,(r.sub and not r.id) and 6 or 0,W-110,(r.sub and not r.id) and 30 or 60,17,ink,F_M,XL).TextTruncate=Enum.TextTruncate.AtEnd
-if r.sub and not r.id then tx(row,r.sub,66,32,W-110,20,12,ink2,F_R,XL) end end end
+local appRow for _,r in ipairs(rows) do if r.id then appRow=r break end end
+local top=60
+if appRow then
+local aid=appRow.id
+local function go(fn) return function() X.spotRecord(f.text) X.closeSpot() task.delay(.1,fn) end end
+local acts={{"Open",nil,function() X.openApp(aid) end}}
+if aid=="music" then acts[2]={"Play / Pause","play",function() X.musToggle() end} acts[3]={"Next Song","next",function() X.musStep(1) end}
+elseif aid=="clock" then acts[2]={"Alarm","A",function() S.clockTab=1 X.openApp("clock") end} acts[3]={"Timer","T",function() S.clockTab=3 X.openApp("clock") end}
+elseif aid=="messages" then acts[2]={"New Message","+",function() X.openApp("messages") end}
+elseif aid=="safari" then acts[2]={"Search Web","S",function() X.openApp("safari") end}
+elseif aid=="camera" then acts[2]={"Take Photo","P",function() X.openApp("camera") end}
+elseif aid=="settings" then acts[2]={"Wi-Fi","W",function() X.openApp("settings") end} acts[3]={"Bluetooth","B",function() X.openApp("settings") end} end
+bub=frost(sg,16,top,W-32,118,26,dk and C3(60,84,86) or WHITE,dk and .3 or .15)
+for i,ac in ipairs(acts) do
+local xc=14+(i-1)*88
+if i==1 then mkIcon(bub,APP[aid],58,xc+2,12).Active=false
+else
+local c=ctr(bub,xc+31,41,54,54,C3(150,160,170),27) c.BackgroundTransparency=.45
+if ac[2]=="play" or ac[2]=="next" then ico(c,ac[2],27,27,20,WHITE) else tx(c,ac[2],0,0,54,54,22,WHITE,F_B) end end
+local lb=tx(bub,i==1 and APP[aid].name or ac[1],xc-4,74,84,38,12,ink,F_M) lb.TextWrapped=true lb.TextYAlignment=Enum.TextYAlignment.Top
+tbtn(bub,xc-4,8,84,104,go(ac[3])) end
+top=top+118+10 end
+local items={{h="Suggestions"},{sug=f.text,safari=true},{sug=f.text.." near me"},{h=appRow and APP[appRow.id].name or "Top Hits",more=appRow~=nil}}
+for _,r in ipairs(rows) do items[#items+1]={row=r} end
+local function ih(it) return it.h and 28 or (it.sug and 46 or 56) end
+local avail=pillY-14-top
+local function total() local t=0 for _,it in ipairs(items) do t=t+ih(it) end return t end
+while total()>avail and #items>4 do items[#items]=nil end
+local hh=total()
+rg=frost(sg,16,math.max(top,pillY-14-hh),W-32,hh,22,dk and C3(44,44,50) or WHITE,dk and .25 or .1)
+local y=0
+for _,it in ipairs(items) do
+if it.h then
+tx(rg,it.h,16,y+6,200,18,13,ink2,F_B,XL)
+if it.more then tx(rg,"Search in App",W-32-176,y+6,160,18,12,ink2,F_M,XR) end
+elseif it.sug then
+if it.safari then mkIcon(rg,APP.safari,26,14,y+10).Active=false
+else local gl=ctr(rg,27,y+23,14,14,ink,7) gl.BackgroundTransparency=1 new("UIStroke",{Color=ink,Thickness=2},gl) ctr(rg,34,y+31,7,2,ink,1,45) end
+tx(rg,it.sug,56,y,W-120,46,16,ink,F_M,XL).TextTruncate=Enum.TextTruncate.AtEnd
+tx(rg,"\u{2197}",W-32-44,y,30,46,18,ink2,F_M)
+tbtn(rg,0,y,W-32,46,function() X.spotRecord(f.text) X.closeSpot() task.delay(.1,function() X.openApp("safari") end) end)
+else
+local r=it.row
+local row=tbtn(rg,0,y,W-32,56,function() pickRow(r) end)
+if r.id then mkIcon(row,APP[r.id],40,12,8).Active=false
+else local c=ctr(row,32,28,40,40,C3(120,130,160),20) tx(c,string.sub(r.sub or "?",1,1),0,0,40,40,16,WHITE,F_B) end
+tx(row,r.title,66,(r.sub and not r.id) and 4 or 0,W-110,(r.sub and not r.id) and 28 or 56,17,ink,F_M,XL).TextTruncate=Enum.TextTruncate.AtEnd
+if r.sub and not r.id then tx(row,r.sub,66,30,W-110,20,12,ink2,F_R,XL) end end
+y=y+ih(it) end end
 f=field(pill,0,0,W-32-50,50,"Search",{pad=50,col=ink,pcol=ink2,ret="search",on=render,
 submit=function() if first then pickRow(first) end end})
 if X.spotRecents then pcall(X.spotRecents,sec,f,render,ink,ink2) end
@@ -5894,7 +5975,7 @@ for i,v in ipairs(S.recents) do if v==id then table.remove(S.recents,i) break en
 table.insert(S.recents,1,id) while #S.recents>6 do table.remove(S.recents) end end
 local function rectOf(o) return (o.AbsolutePosition-dev.AbsolutePosition)/dscale.Scale,o.AbsoluteSize/dscale.Scale end
 do
-local FX={a=0,w=0,ta=0,tw=0,sa=0,sw=0,t0=0,da=.36,dw=1,Z=1.05,R=.9}
+local FX={a=0,w=0,ta=0,tw=0,sa=0,sw=0,t0=0,da=.36,dw=1,Z=1.025,R=.9}
 local function apply()
 local hs=1-(1-FX.R)*FX.a
 homeS.Scale=hs
@@ -5937,7 +6018,7 @@ S.app=app S.screen="app"
 local ok,err=pcall(B[id] or buildGeneric,view,app)
 if not ok then warn("[iOS18] "..tostring(err)) view:ClearAllChildren() buildGeneric(view,app,err) end
 X.applyTint()
-tw(host,CFG.AppOpen,{Position=UDim2.fromOffset(0,0),Size=UDim2.fromOffset(W,H)},EZ.Exponential)
+tw(host,CFG.AppOpen,{Position=UDim2.fromOffset(0,0),Size=UDim2.fromOffset(W,H)},EZ.Back,ED.Out)
 tw(cr,CFG.AppOpen,{CornerRadius=UDim.new(0,DEVICE.rad)},EZ.Exponential) tw(cs,CFG.AppOpen,{Scale=1},EZ.Exponential)
 tw(host,.16,{GroupTransparency=0})
 local ips=src and src.Parent and src:FindFirstChild("ps")
@@ -5951,7 +6032,7 @@ local ref=iconRefs[app.id]
 local x0,y0,sz=CX-30,CY-30,60
 if ref and ((ref[2]==0 and S.page~=3) or ref[2]==S.page or (ref[2]==-2 and X.folderOpen)) then
 x0=ref[3] y0=ref[4] sz=ref[5] or 60 end
-tw(app.host,.36,{Position=UDim2.fromOffset(x0,y0),Size=UDim2.fromOffset(sz,sz)},EZ.Exponential)
+tw(app.host,.36,{Position=UDim2.fromOffset(x0,y0),Size=UDim2.fromOffset(sz,sz)},EZ.Back,ED.Out)
 tw(app.cr,.36,{CornerRadius=UDim.new(0,14)},EZ.Exponential) tw(app.cs,.36,{Scale=.3},EZ.Exponential)
 task.delay(.12,function() tw(app.host,.24,{GroupTransparency=1}) end)
 X.applyTint()
@@ -6179,7 +6260,7 @@ ccL.GroupTransparency=1-p ccIn.Position=UDim2.fromOffset(0,(cur.bcc and 70 or -7
 elseif z=="ntf" then
 if dy>6 and not S.ncOpen and (S.screen=="home" or S.screen=="app") then
 cur.ncd=true X.stopSp(lockL)
-lockL.Visible=true lockL.GroupTransparency=0
+lockL.Visible=true lockL.GroupTransparency=0 X.wallLock.GroupTransparency=0 X.hveil.BackgroundTransparency=1 homeS.Scale=1
 lockL.Position=UDim2.new(.5,0,.5,-H*(1-math.clamp(dy/330,0,1))) if X.teScrub then X.teScrub("lock",math.clamp(dy/330,0,1)) end end
 elseif z=="body" then
 if S.screen=="home" then
@@ -6465,7 +6546,7 @@ BackgroundColor3=WHITE,BackgroundTransparency=.55,BorderSizePixel=0,ZIndex=60},d
 cor(r,.5)
 tw(r,.45,{Size=UDim2.fromOffset(76,76),BackgroundTransparency=1})
 task.delay(.5,function() r:Destroy() end) end
-X.rbOverlay=fr(X.dockFrost,0,0,366,95,WHITE,1,36)
+X.rbOverlay=fr(X.dockFrost,0,0,DEVICE.id=="8plus" and W or 366,95,WHITE,1,DEVICE.id=="8plus" and 0 or 36)
 X.tweakExtra=function()
 local on=X.tweakOn("iconshadow")
 for _,r in ipairs(icons) do
@@ -6474,7 +6555,7 @@ if b.Parent then
 local sd=b:FindFirstChild("isd")
 if on and not sd then new("UIStroke",{Name="isd",Color=BLACK,Transparency=.72,Thickness=1.6},b)
 elseif (not on) and sd then sd:Destroy() end end end
-if X.tweakOn("fiveicondock") and not S.dock5 then
+if X.tweakOn("maxdock") and not S.dock5 then
 S.dock5=true
 if #DOCK<5 then
 local done=false
@@ -6493,6 +6574,45 @@ S.fidBusy=true
 (X.authApp or function(i,cb) X.faceID(cb) end)(id,function() S.fidBusy=false X._ok=id pcall(base,id,src) X._ok=nil end)
 return end
 return base(id,src) end
+do
+local prevOpen,prevClose=X.openApp,X.closeApp
+local TS=game:GetService("TweenService")
+local function tilt(src)
+local x=0
+if src and src.Parent then local ok,v=pcall(function() return (src.AbsolutePosition.X-dev.AbsolutePosition.X)/dscale.Scale+src.AbsoluteSize.X/dscale.Scale/2 end) if ok then x=v end end
+local n=math.clamp((x-CX)/CX,-1,1)
+return -7*n-(n==0 and 3 or 0)
+end
+X.openApp=function(id,src)
+local on=X.tweakOn("ios27anim")
+local before=S.app
+prevOpen(id,src)
+if not on then return end
+local app=S.app
+if not app or app==before or not app.host or not app.host.Parent then return end
+local h=app.host
+local k=(S.rm and .3 or 1)*(X.animMul and X.animMul() or 1)
+h.Rotation=tilt(src)
+TS:Create(h,TweenInfo.new(.62*k,Enum.EasingStyle.Back,Enum.EasingDirection.Out,0,false,0),{Rotation=0}):Play()
+if app.cs then
+local sc=new("UIScale",{Scale=1.0},app.cont)
+sc.Scale=.94
+TS:Create(sc,TweenInfo.new(.55*k,Enum.EasingStyle.Elastic,Enum.EasingDirection.Out),{Scale=1}):Play()
+task.delay(.7*k,function() if sc.Parent then sc:Destroy() end end)
+end
+end
+X.closeApp=function()
+local app=S.app
+local on=X.tweakOn("ios27anim")
+prevClose()
+if not on or not app or not app.host or not app.host.Parent then return end
+local ref=iconRefs and iconRefs[app.id]
+local r=0
+if ref and ref[3] then r=-7*math.clamp((ref[3]+(ref[5] or 60)/2-CX)/CX,-1,1) end
+if r==0 then r=3 end
+TS:Create(app.host,TweenInfo.new(.38,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),{Rotation=r}):Play()
+end
+end
 local snowL=layer(13) snowL.Visible=false
 
 local sosL=layer(50,"CanvasGroup") sosL.Visible=false
@@ -6892,7 +7012,7 @@ end end end
 local function dockPass(t)
 local c=X.dockFrost if not c or not c.Parent then return end
 local want=(acts.dock_float and 722 or 733)+DOFF
-if c.Position.Y.Offset~=want then c.Position=UDim2.fromOffset(12,want) end
+if DEVICE.id~="8plus" and c.Position.Y.Offset~=want then c.Position=UDim2.fromOffset(12,want) end
 local gt=acts.dock_clear and .85 or (acts.dock_ghost and .55 or 0)
 if c.GroupTransparency~=gt then c.GroupTransparency=gt end
 local col
@@ -14407,7 +14527,7 @@ elseif type(it)=="table" then
 if type(it.ids)~="table" then table.remove(S.home[p],i) fix(true) else
 for k=#it.ids,1,-1 do if type(it.ids[k])~="string" or not APP[it.ids[k]] then table.remove(it.ids,k) fix(true) end end end
 else table.remove(S.home[p],i) fix(true) end end end
-if type(S.wrows)~="table" then S.wrows={{"calendar","clock"}} fix(true) end
+if type(S.wrows)~="table" then S.wrows={{"stackw"}} fix(true) end
 for i=#S.wrows,1,-1 do local r=S.wrows[i] if type(r)~="table" then table.remove(S.wrows,i) fix(true) else for k=#r,1,-1 do if not X.WBY[r[k]] then table.remove(r,k) fix(true) end end if #r==0 then table.remove(S.wrows,i) end end end
 if type(S.wsz)~="table" then S.wsz={} fix(true) end
 if type(S.hidden)~="table" then S.hidden={} fix(true) end
@@ -15092,7 +15212,6 @@ if S.opt.gameOri then task.delay(1.5,function() Add.setGameOri(S.opt.gameOri,tru
 end)()
 
 X.applyWalls() X.rebuildWidgets() setPage(1,true) X.refreshStatus() X.updFlash()
-if DEVICE.cols then task.delay(1.4,function() pcall(X.island,DEVICE.name,3) end) end
 X.applyTint() X.applyLockStyle() X.refreshNotifs() X.layoutIcons(true) X.applyWarm()
 S.lastAct=os.clock()
 do
